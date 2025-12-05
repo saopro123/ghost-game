@@ -1,0 +1,233 @@
+fileFormatVersion: 2
+guid: ee986eda5d27e3347b6710bc813368b2
+TextureImporter:
+  internalIDToNameTable:
+  - first:
+      213: 4010562923862242353
+    second: bone-removebg-preview_0
+  - first:
+      213: 6171805101850107086
+    second: bone-removebg-preview_1
+  - first:
+      213: 815558847056198697
+    second: bone-removebg-preview_2
+  - first:
+      213: 3461715869729197260
+    second: bone-removebg-preview_3
+  - first:
+      213: -7378278729455181125
+    second: bone-removebg-preview_4
+  - first:
+      213: 76645857800926284
+    second: bone-removebg-preview_5
+  - first:
+      213: 7919060900931402186
+    second: bone-removebg-preview_6
+  - first:
+      213: -4018758138689126369
+    second: bone-removebg-preview_7
+  - first:
+      213: 1183807199224161864
+    second: bone-removebg-preview_8
+  - first:
+      213: 1388456102702970654
+    second: bone-removebg-preview_9
+  - first:
+      213: -8726904369197361312
+    second: bone-removebg-preview_10
+  - first:
+      213: -9064126139675767557
+    second: bone-removebg-preview_11
+  - first:
+      213: -385152965669689502
+    second: bone-removebg-preview_12
+  - first:
+      213: 3744308816519246753
+    second: bone-removebg-preview_13
+  - first:
+      213: -5241805450177707267
+    second: bone-removebg-preview_14
+  - first:
+      213: -5811644548865291975
+    second: bone-removebg-preview_15
+  - first:
+      213: -3734026602712969649
+    second: bone-removebg-preview_16
+  - first:
+      213: 2398765709987670054
+    second: bone-removebg-preview_17
+  - first:
+      213: -7206981860065654656
+    second: bone-removebg-preview_18
+  - first:
+      213: 341374345523039126
+    second: bone-removebg-preview_19
+  - first:
+      213: -7645769089989359820
+    second: bone-removebg-preview_20
+  - first:
+      213: 1541771414592582361
+    second: bone-removebg-preview_21
+  - first:
+      213: 5823979671576842310
+    second: bone-removebg-preview_22
+  - first:
+      213: 1324172968576615811
+    second: bone-removebg-preview_23
+  - first:
+      213: -1311699600993817551
+    second: bone-removebg-preview_24
+  - first:
+      213: -1698742835087171982
+    second: bone-removebg-preview_25
+  externalObjects: {}
+  serializedVersion: 13
+  mipmaps:
+    mipMapMode: 0
+    enableMipMap: 0
+    sRGBTexture: 1
+    linearTexture: 0
+    fadeOut: 0
+    borderMipMap: 0
+    mipMapsPreserveCoverage: 0
+    alphaTestReferenceValue: 0.5
+    mipMapFadeDistanceStart: 1
+    mipMapFadeDistanceEnd: 3
+  bumpmap:
+    convertToNormalMap: 0
+    externalNormalMap: 0
+    heightScale: 0.25
+    normalMapFilter: 0
+    flipGreenChannel: 0
+  isReadable: 0
+  streamingMipmaps: 0
+  streamingMipmapsPriority: 0
+  vTOnly: 0
+  ignoreMipmapLimit: 0
+  grayScaleToAlpha: 0
+  generateCubemap: 6
+  cubemapConvolution: 0
+  seamlessCubemap: 0
+  textureFormat: 1
+  maxTextureSize: 2048
+  textureSettings:
+    serializedVersion: 2
+    filterMode: 0
+    aniso: 1
+    mipBias: 0
+    wrapU: 1
+    wrapV: 1
+    wrapW: 1
+  nPOTScale: 0
+  lightmap: 0
+  compressionQuality: 50
+  spriteMode: 2
+  spriteExtrude: 1
+  spriteMeshType: 1
+  alignment: 0
+  spritePivot: {x: 0.5, y: 0.5}
+  spritePixelsToUnits: 40
+  spriteBorder: {x: 0, y: 0, z: 0, w: 0}
+  spriteGenerateFallbackPhysicsShape: 1
+  alphaUsage: 1
+  alphaIsTransparency: 1
+  spriteTessellationDetail: -1
+  textureType: 8
+  textureShape: 1
+  singleChannelComponent: 0
+  flipbookRows: 1
+  flipbookColumns: 1
+  maxTextureSizeSet: 0
+  compressionQualitySet: 0
+  textureFormatSet: 0
+  ignorePngGamma: 0
+  applyGammaDecoding: 0
+  swizzle: 50462976
+  cookieLightType: 0
+  platformSettings:
+  - serializedVersion: 4
+    buildTarget: DefaultTexturePlatform
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 0
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Standalone
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  spriteSheet:
+    serializedVersion: 2
+    sprites:
+    - serializedVersion: 2
+      name: bone-removebg-preview_0
+      rect:
+        serializedVersion: 2
+        x: 0
+        y: 0
+        width: 500
+        height: 500
+      alignment: 0
+      pivot: {x: 0, y: 0}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: -1
+      bones: []
+      spriteID: 134392afab168a730800000000000000
+      internalID: 4010562923862242353
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    outline: []
+    customData: 
+    physicsShape: []
+    bones: []
+    spriteID: a0327e84b2e6b1c44bac95e74b7c9cc0
+    internalID: 0
+    vertices: []
+    indices: 
+    edges: []
+    weights: []
+    secondaryTextures: []
+    spriteCustomMetadata:
+      entries:
+      - key: SpriteEditor.SliceSettings
+        value: '{"sliceOnImport":false,"gridCellCount":{"x":1.0,"y":1.0},"gridSpriteSize":{"x":500.0,"y":500.0},"gridSpriteOffset":{"x":0.0,"y":0.0},"gridSpritePadding":{"x":0.0,"y":0.0},"pivot":{"x":0.0,"y":0.0},"autoSlicingMethod":0,"spriteAlignment":0,"slicingType":1,"keepEmptyRects":false,"isAlternate":false}'
+    nameFileIdTable:
+      bone-removebg-preview_0: 4010562923862242353
+  mipmapLimitGroupName: 
+  pSDRemoveMatte: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
