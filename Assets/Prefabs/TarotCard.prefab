@@ -82,6 +82,14 @@ MonoBehaviour:
   devilDamageTakenMultiplier: 1
   cardRenderer: {fileID: 3547732089706896516}
   displayPosition: {x: 0, y: 0, z: 0}
+  diceFaces:
+  - {fileID: 39516445742236537, guid: 149b7d2e38863e146bd65ed65e28451a, type: 3}
+  - {fileID: 1813239885723335896, guid: 149b7d2e38863e146bd65ed65e28451a, type: 3}
+  - {fileID: 2376305099863235458, guid: 149b7d2e38863e146bd65ed65e28451a, type: 3}
+  - {fileID: -7464760887336577109, guid: 149b7d2e38863e146bd65ed65e28451a, type: 3}
+  - {fileID: -8866378825118310145, guid: 149b7d2e38863e146bd65ed65e28451a, type: 3}
+  - {fileID: -3287765887320952711, guid: 149b7d2e38863e146bd65ed65e28451a, type: 3}
+  rollDuration: 3
 --- !u!212 &3547732089706896516
 SpriteRenderer:
   m_ObjectHideFlags: 0

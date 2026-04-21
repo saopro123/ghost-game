@@ -175,7 +175,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d694091987162834ab71572df9e1d525, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHealth: 1000
+  maxHealth: 2000
   currentHealth: 0
   contactDamage: 10
   isBoss: 1
@@ -187,6 +187,7 @@ MonoBehaviour:
   hitFlashDuration: 0.05
   hitFlashCount: 1
   deathFadeDuration: 1
+  pickupPrefabs: []
   bonePrefab: {fileID: 15440857258387227, guid: 65e81f43333b1304da42768619c7c0a2, type: 3}
   boneSpawnInterval: 1
   boneSpeed: 7

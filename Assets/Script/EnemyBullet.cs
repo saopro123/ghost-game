@@ -22,6 +22,8 @@ public class EnemyBullet : MonoBehaviour
 
     void Start()
     {
+        float finalSpeed = speed * Player.enemyBulletSpeedMultiplier;
+        rb.linearVelocity = moveDirection * finalSpeed;
         // Nếu không có hướng cụ thể được thiết lập từ bên ngoài, mặc định bay sang trái
         if (moveDirection == Vector2.zero)
         {

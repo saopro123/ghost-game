@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd09717bfd0d3ea46864cc9af4f3ab4f, type: 3}
+  m_Name: Blessing_8
+  m_EditorClassIdentifier: 
+  blessingName: "Demon\u2019s Haste"
+  description: "T\u0103ng 40% t\u1ED1c \u0111\u1ED9 b\u1EAFn, nh\u01B0ng \u0111\u1ED5i
+    l\u1EA1i b\u1EA1n s\u1EBD nh\u1EADn th\xEAm 25% s\xE1t th\u01B0\u01A1ng t\u1EEB
+    m\u1ECDi ngu\u1ED3n."
+  cardFace: {fileID: 21300000, guid: a394a9c972620b74a9e7eea8a1a2120c, type: 3}
+  type: 1
+  id: 8

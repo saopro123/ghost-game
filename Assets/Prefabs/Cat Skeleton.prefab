@@ -176,9 +176,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 68c264f507252f142b00d56c4c69567f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHealth: 100
+  maxHealth: 300
   currentHealth: 0
   contactDamage: 10
+  isBoss: 0
   moveSpeed: 3
   yTrackingMultiplier: 0.5
   spriteRenderer: {fileID: 0}
@@ -186,8 +187,9 @@ MonoBehaviour:
   hitFlashColor2: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   hitFlashDuration: 0.05
   hitFlashCount: 1
+  deathFadeDuration: 1
+  pickupPrefabs: []
   type: 0
-  attackRate: 2.5
   bulletPrefab: {fileID: 7683735423314721568, guid: c34bd332a14bb8b41b9a8d98520eadf8, type: 3}
   bulletSpeed: 7
   bonePrefab: {fileID: 15440857258387227, guid: 65e81f43333b1304da42768619c7c0a2, type: 3}

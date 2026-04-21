@@ -28,6 +28,7 @@ public class AudioManager : MonoBehaviour
     [Tooltip("Mức âm lượng nhạc nền tối đa")]
     [Range(0f, 1f)]
     public float maxMusicVolume = 0.6f;
+    public AudioClip frostBlastSFX;
 
     private Coroutine fadeRoutine;
 
@@ -84,18 +85,18 @@ public class AudioManager : MonoBehaviour
         float startVolume = MusicSource.volume;
         float timer = 0f;
 
-        // Nếu đã ở mức volume 0 (hoặc rất nhỏ), bỏ qua Fade Out
         if (startVolume > 0.01f)
         {
             while (timer < fadeDuration)
             {
-                timer += Time.deltaTime;
+                // SỬA TẠI ĐÂY: Dùng unscaledDeltaTime
+                timer += Time.unscaledDeltaTime;
                 MusicSource.volume = Mathf.Lerp(startVolume, 0f, timer / fadeDuration);
                 yield return null;
             }
         }
 
-        MusicSource.Stop(); // Dừng nhạc cũ
+        MusicSource.Stop();
 
         // 2. Thiết lập nhạc mới
         MusicSource.clip = newClip;
@@ -106,15 +107,15 @@ public class AudioManager : MonoBehaviour
         timer = 0f;
         while (timer < fadeDuration)
         {
-            timer += Time.deltaTime;
+            // SỬA TẠI ĐÂY: Dùng unscaledDeltaTime
+            timer += Time.unscaledDeltaTime;
             MusicSource.volume = Mathf.Lerp(0f, maxMusicVolume, timer / fadeDuration);
             yield return null;
         }
 
-        MusicSource.volume = maxMusicVolume; // Đảm bảo đạt mức âm lượng tối đa
+        MusicSource.volume = maxMusicVolume;
         fadeRoutine = null;
     }
-
     /// <summary>
     /// Phát một hiệu ứng âm thanh (SFX) một lần.
     /// </summary>
@@ -143,5 +144,67 @@ public class AudioManager : MonoBehaviour
     public void PlayPlayerShootSFX()
     {
         PlaySFX(playerShootSFX);
+    }
+    // Thêm vào AudioManager.cs
+
+    [Header("== New Sound Effects ==")]
+    public AudioClip explosionSFX;
+    public AudioClip coinHitSFX;
+    public AudioClip pickupSFX; // Tiện tay thêm tiếng nhặt đồ luôn
+
+    // Hàm phát tiếng nổ
+    public void PlayExplosionSFX()
+    {
+        if (explosionSFX != null)
+            SFXSource.PlayOneShot(explosionSFX);
+    }
+
+    // Hàm phát tiếng đồng xu bị trúng đạn
+    public void PlayCoinHitSFX()
+    {
+        if (coinHitSFX != null)
+            SFXSource.PlayOneShot(coinHitSFX);
+    }
+
+    // Hàm phát tiếng nhặt đồ
+    public void PlayPickupSFX()
+    {
+        if (pickupSFX != null)
+            SFXSource.PlayOneShot(pickupSFX);
+    }
+    public void PlayFrostBlastSFX()
+    {
+        if (frostBlastSFX != null)
+            SFXSource.PlayOneShot(frostBlastSFX);
+    }
+
+    // Hàm dùng để tắt nhạc ngay lập tức
+    public void StopMusic()
+    {
+        if (MusicSource != null)
+        {
+            MusicSource.Stop();
+            fadeRoutine = null; // Hủy coroutine fade nếu đang chạy
+        }
+    }
+    [Header("== Music Clips ==")]
+    // ... các biến cũ ...
+    public AudioClip dialogueMusic; // Nhạc nền dành riêng cho hội thoại
+
+    [Header("== Sound Effect Clips ==")]
+    // ... các biến cũ ...
+    public AudioClip nextDialogueSFX; // Tiếng click khi qua lời thoại
+
+    // --- HÀM GỌI CHO DIALOGUE ---
+
+    public void PlayDialogueMusic()
+    {
+        PlayMusic(dialogueMusic);
+    }
+
+    public void PlayNextDialogueSFX()
+    {
+        if (nextDialogueSFX != null)
+            SFXSource.PlayOneShot(nextDialogueSFX);
     }
 }

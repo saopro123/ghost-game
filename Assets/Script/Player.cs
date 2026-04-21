@@ -87,10 +87,28 @@ public class Player : MonoBehaviour
     private float targetY;
     private Rigidbody2D rb;
     private UIManager uiManager;
+    public bool tookDamageInEvent = false;
+    public bool isVSplitShot = false;
 
     // THAM CHIẾU MỚI: Game Menu Manager
     private GameMenuManager gameMenuManager;
+    public static Player Instance; // Khai báo biến Instance tĩnh
+    [Header("== Devil Synergy Settings ==")]
+    public int devilLives = 0;
+    public float currentDevilDmgBonus = 0f; // 0.5f tương đương 50%
+    private int devilKillCounter = 0;
+    private const int KILLS_FOR_LIFE = 10;
+    private Coroutine explosiveRoutine;
+    private Coroutine invincibilityRoutine;
 
+    void Awake()
+    {
+        if (Instance == null) Instance = this;
+        else { Destroy(gameObject); return; }
+
+        // --- RESET STATIC VARS ---
+        enemyBulletSpeedMultiplier = 1f;
+    }
 
     private void Start()
     {
@@ -112,7 +130,7 @@ public class Player : MonoBehaviour
         else
         {
             // Cập nhật UI ngay khi bắt đầu
-            uiManager.UpdatePurificationMeter(currentPurification);
+            uiManager.UpdatePurificationMeter(currentPurification, maxPurification);
             // Cập nhật Gold ban đầu
             uiManager.UpdateGoldDisplay(totalGold);
         }
@@ -166,6 +184,12 @@ public class Player : MonoBehaviour
             }
         }
         targetY = Mathf.Clamp(targetY, minYBoundary, maxYBoundary);
+        // đoạn code này sẽ tự gán các chỉ số cần thiết.
+        if (isDevilSynergy && currentDevilDmgBonus == 0)
+        {
+            currentDevilDmgBonus = 0.5f;
+            if (devilLives == 0) devilLives = 1;
+        }
     }
 
     private void FixedUpdate()
@@ -198,39 +222,49 @@ public class Player : MonoBehaviour
 
     private void Shoot()
     {
-        if (currentBulletPrefab != null && firePoint != null)
+        if (currentBulletPrefab == null || firePoint == null) return;
+
+        // 1. Tính toán sát thương cơ bản
+        float baseOutput = damagePerBullet + tarotBonusDamage;
+        if (isMysticSynergy) baseOutput += (totalGold / 50);
+
+        // 2. Áp dụng Devil Synergy Bonus
+        float devilBonus = baseOutput * currentDevilDmgBonus;
+        float currentOutput = baseOutput + devilBonus;
+
+        // 3. Holy Cross (X2 nếu máu dưới 30%)
+        if (hasHolyCross && currentPurification < maxPurification * 0.3f)
         {
-            // Tính toán khoảng cách (offset) giữa các viên đạn
+            currentOutput *= 2;
+            // Debug.Log("<color=yellow>HOLY CROSS X2!</color>");
+        }
+
+        int finalBulletDamage = Mathf.RoundToInt(currentOutput);
+
+        // IN RA CONSOLE ĐỂ KIỂM TRA
+        // Debug.Log("Final DMG: " + finalBulletDamage + " (Base: " + baseOutput + ", Devil Bonus: " + devilBonus + ")");
+
+        // --- THỰC HIỆN BẮN ---
+        if (isVSplitShot)
+        {
+            SpawnBulletWithAngle(-45f, finalBulletDamage);
+            SpawnBulletWithAngle(45f, finalBulletDamage);
+        }
+        else
+        {
             float totalOffset = (projectileAmount - 1) * projectileOffset;
             float startOffset = -totalOffset / 2f;
-
-            // Tính toán sát thương tổng (Damage cơ bản + Damage Tarot)
-            // LƯU Ý: Nếu viên đạn có script riêng (PlayerBullet), bạn cần gán giá trị này trong đó.
-            int totalDamage = damagePerBullet + tarotBonusDamage;
 
             for (int i = 0; i < projectileAmount; i++)
             {
                 float currentYOffset = startOffset + i * projectileOffset;
-
-                // Vị trí spawn của viên đạn
                 Vector3 spawnPosition = firePoint.position;
                 spawnPosition.y += currentYOffset;
-
-                // Tạo đạn
-                GameObject bulletObj = Instantiate(currentBulletPrefab, spawnPosition, Quaternion.identity);
-
-                // Gán sát thương cho viên đạn 
-                // Ví dụ: 
-                // PlayerBullet bulletScript = bulletObj.GetComponent<PlayerBullet>();
-                // if (bulletScript != null) bulletScript.damage = totalDamage; 
-            }
-
-            // 🆕 PHÁT ÂM THANH BẮN ĐẠN!
-            if (AudioManager.Instance != null)
-            {
-                AudioManager.Instance.PlayPlayerShootSFX();
+                SpawnBulletWithAngle(0f, finalBulletDamage, spawnPosition);
             }
         }
+
+        if (AudioManager.Instance != null) AudioManager.Instance.PlayPlayerShootSFX();
     }
 
     // ==========================================================
@@ -258,64 +292,38 @@ public class Player : MonoBehaviour
     }
 
     // HÀM MỚI: The Fool - Giảm Max HP
+    // Giảm Max HP (Dùng cho lá bài The Fool hoặc trừng phạt)
     public void DecreaseMaxHP(int amount)
     {
-        // 1. Giảm Max Purification
         maxPurification -= amount;
-        maxPurification = Mathf.Max(baseMaxPurification, maxPurification); // Đảm bảo không thấp hơn HP ban đầu
+        // Tối thiểu là 25 HP (1 tim)
+        if (maxPurification < 25) maxPurification = 25;
 
-        // 2. Giảm số vòng Halo đã mua nếu cần
-        int reducedHalos = amount / PURIFICATION_PER_HALO;
-        currentUpgradedHalos = Mathf.Max(0, currentUpgradedHalos - reducedHalos);
+        // Nếu máu hiện tại vượt quá mức trần mới -> cắt bớt
+        if (currentPurification > maxPurification) currentPurification = maxPurification;
 
-        // 3. Đảm bảo máu hiện tại không vượt quá max mới
-        currentPurification = Mathf.Min(currentPurification, maxPurification);
-
-        // 4. Cập nhật UI và Alpha
-        if (uiManager != null)
-        {
-            uiManager.UpdatePurificationMeter(currentPurification);
-        }
-        UpdateGhostAlpha();
-        Debug.Log($"Max HP giảm: {maxPurification}");
+        RefreshHPUI();
+        Debug.Log($"Max HP decreased to: {maxPurification}");
     }
 
 
     // Hàm mới: Tăng Max HP hoặc chỉ hồi máu nếu đã đạt giới hạn 8 Halo
     public bool TryIncreaseMaxHP(int amount)
     {
-        // Kiểm tra xem đã đạt giới hạn vòng Halo mua thêm chưa (4 vòng)
-        if (currentUpgradedHalos >= maxUpgradableHalos)
+        if (isDevilSynergy) { damagePerBullet += 10; return false; }
+
+        // Giới hạn tối đa 10 tim (250 HP)
+        if (maxPurification >= 250)
         {
-            // Đã đạt giới hạn Max HP, chỉ hồi máu chứ không tăng Max HP
             Heal(amount);
-            Debug.Log("Max HP đã đạt giới hạn (200 HP). Chỉ hồi máu.");
-            return false; // Báo hiệu không tăng Max HP
+            return false;
         }
 
-        // Đảm bảo lượng tăng thêm là 25 (hoặc bội số của PURIFICATION_PER_HALO)
-        if (amount != PURIFICATION_PER_HALO)
-        {
-            Debug.LogWarning($"Lượng HP tăng thêm ({amount}) không khớp với giá trị Halo ({PURIFICATION_PER_HALO})!");
-        }
-
-        // Nếu chưa đạt giới hạn, tiến hành tăng Max HP
         maxPurification += amount;
-        currentUpgradedHalos++;
+        currentPurification += amount; // Tăng bình chứa thì đổ đầy thêm luôn
 
-        // Hồi máu tương ứng với lượng máu tối đa tăng thêm
-        currentPurification += amount;
-        currentPurification = Mathf.Min(maxPurification, currentPurification);
-
-        // Cần báo cho UIManager cập nhật cả Max HP (số vòng Halo) và Current HP
-        if (uiManager != null)
-        {
-            uiManager.UpdatePurificationMeter(currentPurification);
-        }
-
-        UpdateGhostAlpha();
-        Debug.Log($"Max HP tăng: {maxPurification} (Vòng đã mua: {currentUpgradedHalos}/{maxUpgradableHalos})");
-        return true; // Báo hiệu đã tăng Max HP thành công
+        RefreshHPUI();
+        return true;
     }
 
 
@@ -372,28 +380,26 @@ public class Player : MonoBehaviour
 
     public void TakeDamage(int damageAmount)
     {
-        // TÍNH TOÁN SÁT THƯƠNG THỰC TẾ (Bao gồm hệ số nhân Tarot)
+        if (isInvincible) return;
+        tookDamageInEvent = true;
+
+        if (hasShield)
+        {
+            hasShield = false;
+            StartCoroutine(IFrameRoutine(1f));
+            RefreshHPUI(); // Để cập nhật lại màu Ghost Alpha
+            return;
+        }
+
         float damageMultiplier = 1f + tarotDamageTakenMultiplier;
         int finalDamage = Mathf.RoundToInt(damageAmount * damageMultiplier);
-
         currentPurification -= finalDamage;
-        currentPurification = Mathf.Max(0, currentPurification); // Đảm bảo không âm
 
-        if (uiManager != null)
+        if (currentPurification <= 0) Die();
+        else
         {
-            uiManager.UpdatePurificationMeter(currentPurification);
-        }
-
-        if (spriteRenderer != null)
-        {
-            StartCoroutine(HitFlashRoutine(hitFlashCount));
-        }
-
-        UpdateGhostAlpha();
-
-        if (currentPurification <= 0)
-        {
-            Die();
+            if (spriteRenderer != null) StartCoroutine(HitFlashRoutine(hitFlashCount));
+            RefreshHPUI();
         }
     }
 
@@ -401,12 +407,7 @@ public class Player : MonoBehaviour
     public void FullHeal()
     {
         currentPurification = maxPurification;
-        if (uiManager != null)
-        {
-            uiManager.UpdatePurificationMeter(currentPurification);
-        }
-        UpdateGhostAlpha();
-        Debug.Log("Player đã được hồi máu đầy đủ.");
+        RefreshHPUI();
     }
 
     public void Heal(int amount)
@@ -416,7 +417,7 @@ public class Player : MonoBehaviour
 
         if (uiManager != null)
         {
-            uiManager.UpdatePurificationMeter(currentPurification);
+            uiManager.UpdatePurificationMeter(currentPurification, maxPurification);
         }
 
         UpdateGhostAlpha();
@@ -473,20 +474,259 @@ public class Player : MonoBehaviour
     // SỬA HÀM QUAN TRỌNG: Thay thế Destroy/Set Active bằng gọi GameMenuManager
     private void Die()
     {
-        Debug.Log("Game Over! Player Purification hết.");
+        if (isDevilSynergy && devilLives > 0)
+        {
+            devilLives--;
+            currentDevilDmgBonus = Mathf.Max(0, currentDevilDmgBonus - 0.10f); // Giảm 10% bonus
+            currentPurification = 1; // Trở lại với 1 HP
+            gameObject.SetActive(true); // Đảm bảo player vẫn active
+            StartCoroutine(IFrameRoutine(2f)); // Cho 2s bất tử để chạy
+            RefreshHPUI();
+            Debug.Log("Devil Revive! Lives left: " + devilLives);
+            return;
+        }
 
-        // 1. Tắt đối tượng Player (để nó không tương tác nữa)
+        Debug.Log("Game Over!");
         gameObject.SetActive(false);
+        if (gameMenuManager != null) gameMenuManager.GameOver();
+    }
+    [Header("== Blessing States ==")]
+    public GameObject explosionPrefab;
+    public GameObject spectralBuddyPrefab; // Nếu bạn làm đệ tử
+    private bool hasShield = false;
+    private bool isInvincible = false;
+    private int killCountForHeal = 0;
+    public bool hasExplosionOnDeath = false;
+    public bool hasHolyCross = false;
+    public static float enemyBulletSpeedMultiplier = 1f;
+    public bool isDevilSynergy = false; // Thêm dòng này vào đầu class Player
+    public bool isMysticSynergy = false; // Thêm luôn cái này cho Synergy Mystic
+    public bool isDivineSynergy = false;
+    public bool hasFateDiscount = false;
+    // --- HÀM CHÍNH ĐỂ APPLY 12 BLESSING ---
+    public void ApplyBlessing(int id)
+    {
+        switch (id)
+        {
+            // --- DIVINE ---
+            case 1: StartCoroutine(ShieldRegenRoutine()); break;
+            case 2: killCountForHeal = 0; break; // Logic nằm trong AddKill()
+            case 3: moveSpeed *= 1.2f; transform.localScale *= 0.85f; break;
+            case 4: hasHolyCross = true; break;
 
-        // 2. Gọi Game Over
-        if (gameMenuManager != null)
-        {
-            gameMenuManager.GameOver();
+            // --- DEVIL ---
+            case 5: damagePerBullet += 30; DecreaseMaxHP(25); break;
+            case 6: hasExplosionOnDeath = true; break; // Logic nằm trong Enemy.Die()
+            case 7: projectileAmount += 2; fireRate += 0.1f; break;
+            case 8: fireRate *= 0.6f; tarotDamageTakenMultiplier += 0.25f; break;
+
+            // --- MYSTIC ---
+            case 9: goldMultiplier += 0.5f; break;
+            case 10: Instantiate(spectralBuddyPrefab, transform.position, Quaternion.identity); break;
+            case 11: hasFateDiscount = true; break;
+            case 12: enemyBulletSpeedMultiplier = 0.75f; break;
         }
-        else
+    }
+
+    // Logic cho Shield (ID 1)
+    IEnumerator ShieldRegenRoutine()
+    {
+        while (true)
         {
-            // Trường hợp lỗi (Không tìm thấy Manager)
-            Debug.LogError("GameMenuManager not found! Cannot show Game Over screen.");
+            if (!hasShield)
+            {
+                yield return new WaitForSeconds(30f);
+                hasShield = true;
+                spriteRenderer.color = new Color(0.5f, 0.8f, 1f, 1f); // Xanh nhạt
+            }
+            yield return null;
         }
+    }
+
+    // Ghi đè TakeDamage để xử lý Shield và I-Frame
+    public void NewTakeDamage(int damage)
+    {
+        if (isInvincible) return;
+
+        if (hasShield)
+        {
+            hasShield = false;
+            UpdateGhostAlpha(); // Trở lại màu bình thường
+            StartCoroutine(IFrameRoutine(1f)); // 1s bất tử
+            return;
+        }
+
+        // Tính sát thương dựa trên Holy Cross (ID 4)
+        int finalDmg = (currentPurification < maxPurification * 0.3f) ? damage : damage;
+        // Nếu bạn muốn ID 4 tăng sát thương của BẠN, hãy check trong hàm Shoot()
+
+        TakeDamage(finalDmg); // Gọi hàm TakeDamage gốc
+    }
+
+    IEnumerator IFrameRoutine(float duration)
+    {
+        isInvincible = true;
+        float timer = 0;
+        while (timer < duration)
+        {
+            spriteRenderer.enabled = !spriteRenderer.enabled; // Nhấp nháy
+            yield return new WaitForSeconds(0.1f);
+            timer += 0.1f;
+        }
+        spriteRenderer.enabled = true;
+        isInvincible = false;
+    }
+
+    public void AddKill()
+    {
+        killCountForHeal++;
+        if (killCountForHeal >= 15) { Heal(5); killCountForHeal = 0; }
+
+        // Logic riêng cho Devil Synergy
+        if (isDevilSynergy)
+        {
+            devilKillCounter++;
+            if (devilKillCounter >= KILLS_FOR_LIFE)
+            {
+                devilKillCounter = 0;
+
+                if (devilLives < 3)
+                {
+                    devilLives++;
+                    currentDevilDmgBonus = Mathf.Min(0.5f, currentDevilDmgBonus + 0.05f);
+                    Debug.Log("Devil Life Gained! Bonus: " + currentDevilDmgBonus);
+                }
+                else
+                {
+                    // Đủ mạng rồi thì chỉ cộng bonus đến max 50%
+                    currentDevilDmgBonus = Mathf.Min(0.5f, currentDevilDmgBonus + 0.05f);
+                }
+            }
+        }
+    }
+    public void ActivateDevilSynergy()
+    {
+        isDevilSynergy = true;
+        maxPurification = 25; // Để 1 tim (25HP) cho đỡ quá khó so với 1HP
+        currentPurification = 25;
+        devilLives = 1; // Cho sẵn 1 mạng khi kích hoạt
+        currentDevilDmgBonus = 0.5f; // Bắt đầu với 50% bonus
+        RefreshHPUI();
+    }
+    public void ActivateDivineSynergy()
+    {
+        maxPurification += 100;
+        FullHeal();
+        // Giảm thời gian hồi shield (nếu bạn dùng biến float cho cooldown shield)
+        // Ví dụ: shieldCooldown = 10f; 
+        Debug.Log("DIVINE SYNERGY: Max HP +100 & Fast Shield Regen!");
+    }
+    public void ActivateMysticSynergy()
+    {
+        isMysticSynergy = true;
+        // Tự động kích hoạt hút tiền (Fate's Magnet)
+        Debug.Log("MYSTIC SYNERGY: Shop limit removed & Damage scales with Gold!");
+    }
+    public void ResetStatsToBase()
+    {
+        damagePerBullet = 10;
+        fireRate = 0.2f;
+        projectileAmount = 1;
+        luck = 0f;
+        goldMultiplier = 1.0f;
+        // Lưu ý: Không reset Max HP vì nó liên quan đến vòng Halo UI, 
+        // trừ khi bạn muốn làm cực kỳ chi tiết. Tạm thời giữ nguyên HP.
+    }
+    void SpawnBulletWithAngle(float angle, int dmg, Vector3? customPos = null)
+    {
+        Vector3 pos = customPos ?? firePoint.position;
+        GameObject bulletObj = Instantiate(currentBulletPrefab, pos, Quaternion.Euler(0, 0, angle));
+        PlayerBullet bulletScript = bulletObj.GetComponent<PlayerBullet>();
+        if (bulletScript != null)
+        {
+            bulletScript.damage = dmg;
+
+            // NẾU DMG > 20, phóng to viên đạn cho dễ nhìn
+            if (dmg > 20) bulletObj.transform.localScale *= 1.5f;
+            // NẾU có Devil Synergy, đổi đạn sang màu đỏ
+            if (isDevilSynergy) bulletObj.GetComponent<SpriteRenderer>().color = Color.red;
+        }
+    }
+    public void PenaltyHalfHealth()
+    {
+        currentPurification /= 2;
+        if (currentPurification < 1) currentPurification = 1;
+        RefreshHPUI();
+    }
+    // Trong Player.cs
+    public IEnumerator TempDamageBuffRoutine(int amount, float duration)
+    {
+        damagePerBullet += amount;
+        Debug.Log($"Temp Buff: +{amount} DMG for {duration}s");
+
+        yield return new WaitForSeconds(duration);
+
+        damagePerBullet -= amount;
+        Debug.Log("Temp Buff expired.");
+    }
+    public void RefreshHPUI()
+    {
+        if (uiManager != null)
+        {
+            uiManager.UpdatePurificationMeter(currentPurification, maxPurification);
+        }
+        UpdateGhostAlpha();
+    }
+    [Header("== Pickup Settings ==")]
+    public bool isExplosiveRoundsActive = false;
+    private int blessingShardCount = 0;
+
+    public void AddBlessingShard()
+    {
+        blessingShardCount++;
+        Debug.Log("Blessing Shards: " + blessingShardCount + "/3");
+        if (blessingShardCount >= 3)
+        {
+            blessingShardCount = 0;
+            BlessingMenu.Instance.ShowBlessingSelection();
+        }
+    }
+
+    public void ActivateExplosiveRounds(float duration)
+    {
+        // Nếu đang có hiệu ứng thì dừng cái cũ ngay lập tức
+        if (explosiveRoutine != null) StopCoroutine(explosiveRoutine);
+        // Bắt đầu cái mới (Thời gian sẽ tính lại từ đầu)
+        explosiveRoutine = StartCoroutine(ExplosiveRoundsRoutine(duration));
+    }
+
+    IEnumerator ExplosiveRoundsRoutine(float duration)
+    {
+        isExplosiveRoundsActive = true;
+        yield return new WaitForSeconds(duration);
+        isExplosiveRoundsActive = false;
+        explosiveRoutine = null; // Giải phóng biến
+    }
+
+    public void ActivatePowerInvincibility(float duration)
+    {
+        if (invincibilityRoutine != null) StopCoroutine(invincibilityRoutine);
+        invincibilityRoutine = StartCoroutine(PowerInvincibilityRoutine(duration));
+    }
+
+    IEnumerator PowerInvincibilityRoutine(float duration)
+    {
+        isInvincible = true;
+        float timer = 0;
+        while (timer < duration)
+        {
+            spriteRenderer.color = Color.Lerp(Color.red, Color.yellow, Mathf.PingPong(Time.time * 5, 1));
+            timer += Time.deltaTime;
+            yield return null;
+        }
+        spriteRenderer.color = Color.white;
+        UpdateGhostAlpha();
+        isInvincible = false;
+        invincibilityRoutine = null; // Giải phóng biến
     }
 }

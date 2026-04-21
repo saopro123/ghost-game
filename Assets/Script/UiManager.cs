@@ -55,7 +55,7 @@ public class UIManager : MonoBehaviour
         // Cập nhật UI ngay khi bắt đầu game
         if (player != null)
         {
-            UpdatePurificationMeter(player.currentPurification);
+            UpdatePurificationMeter(player.currentPurification, player.maxPurification);
             UpdateGoldDisplay(player.totalGold);
         }
     }
@@ -80,46 +80,35 @@ public class UIManager : MonoBehaviour
     }
 
     // Hàm public được gọi bởi Player mỗi khi máu thay đổi (bao gồm cả tăng Max HP)
-    public void UpdatePurificationMeter(int currentHealth)
+    public void UpdatePurificationMeter(int currentHP, int maxHP)
     {
-        if (player == null) return;
+        if (haloIcons == null || haloIcons.Length == 0) return;
 
-        // 1. Tính toán tổng số vòng Halo đang được hiển thị
-        int totalDisplayedHalos = BASE_HALO_COUNT + player.currentUpgradedHalos;
+        // 1. Tính số lượng ô tim cần hiển thị (25 HP = 1 ô)
+        int totalContainers = maxHP / 25;
 
-        // Đảm bảo không vượt quá giới hạn mảng
-        totalDisplayedHalos = Mathf.Min(totalDisplayedHalos, haloIcons.Length);
+        // 2. Tính số lượng ô tim đang đầy
+        // Dùng float để tính toán chính xác hơn nếu enemy đánh lẻ (ví dụ 10 dmg)
+        // Ô tim chỉ rỗng khi mất sạch 25 HP của ô đó
+        int fullHearts = currentHP / 25;
 
-        // 2. Kích hoạt/Ẩn các Halo Icon dựa trên Max HP đã mua
         for (int i = 0; i < haloIcons.Length; i++)
         {
-            if (haloIcons[i] != null)
+            if (i < totalContainers)
             {
-                if (i < totalDisplayedHalos)
-                {
-                    haloIcons[i].gameObject.SetActive(true);
-                }
+                // HIỆN ô tim trong giới hạn Max HP
+                haloIcons[i].gameObject.SetActive(true);
+
+                // Đổi Sprite Đầy hoặc Rỗng
+                if (i < fullHearts)
+                    haloIcons[i].sprite = fullHaloSprite;
                 else
-                {
-                    haloIcons[i].gameObject.SetActive(false);
-                }
-            }
-        }
-
-        // 3. Cập nhật Sprite (Đầy/Rỗng)
-        int fullIcons = currentHealth / PURIFICATION_PER_ICON;
-
-        for (int i = 0; i < totalDisplayedHalos; i++)
-        {
-            if (i < fullIcons)
-            {
-                // Icon đang đầy (Full Halo)
-                haloIcons[i].sprite = fullHaloSprite;
+                    haloIcons[i].sprite = emptyHaloSprite;
             }
             else
             {
-                // Icon đang rỗng (Empty Halo)
-                haloIcons[i].sprite = emptyHaloSprite;
+                // ẨN các ô tim vượt quá giới hạn Max HP
+                haloIcons[i].gameObject.SetActive(false);
             }
         }
     }
@@ -135,6 +124,15 @@ public class UIManager : MonoBehaviour
         {
             // Hiển thị số Gold (luôn là số nguyên)
             goldText.text = currentGold.ToString();
+        }
+    }
+    public void OnPauseButtonClicked()
+    {
+        // Kiểm tra nếu GameMenuManager tồn tại và game đang ở trạng thái chơi
+        if (GameMenuManager.Instance != null && GameMenuManager.CurrentState == GameMenuManager.GameState.Playing)
+        {
+            Debug.Log("UI Manager: Pause Button Clicked.");
+            GameMenuManager.Instance.PauseGame();
         }
     }
 }

@@ -272,7 +272,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c5f14fcb2d7b72d4691ef52f33ce506c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHealth: 1300
+  maxHealth: 2000
   currentHealth: 0
   contactDamage: 10
   isBoss: 1
@@ -284,6 +284,7 @@ MonoBehaviour:
   hitFlashDuration: 0.05
   hitFlashCount: 1
   deathFadeDuration: 1
+  pickupPrefabs: []
   minionPrefab: {fileID: 6753031421976517571, guid: 82b07e973858ca84eba7a89c5b59e5ed, type: 3}
   minionSpawnPoints:
   - {fileID: 4506650805963486366}

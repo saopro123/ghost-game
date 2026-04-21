@@ -181,13 +181,28 @@ public class TarotCard : MonoBehaviour
         // 3. Chờ và Kết thúc sự kiện (trừ khi Game Over/Win)
         if (selectedCardType != CardType.Death && selectedCardType != CardType.TheWorld)
         {
-            yield return new WaitForSeconds(2.5f);
+            yield return new WaitForSeconds(5f);
             EndTarotEvent();
         }
         else
         {
             yield break; // Game dừng ở Game Over/Win
         }
+        yield return new WaitForSecondsRealtime(1.5f);
+
+        // 2. Kích hoạt hiệu ứng
+        ActivateEffect(selectedCardType);
+
+        // 3. CHỈ KẾT THÚC Ở ĐÂY NẾU KHÔNG PHẢI XÚC XẮC VÀ THẮNG/THUA
+        if (selectedCardType != CardType.WheelOfFortune &&
+            selectedCardType != CardType.TheWorld &&
+            selectedCardType != CardType.Death)
+        {
+            yield return new WaitForSecondsRealtime(5f);
+            EndTarotEvent();
+        }
+        // Nếu là WheelOfFortune: Nó sẽ KHÔNG chạy xuống đây, 
+        // mà sẽ đợi hàm RollDiceRoutine tự gọi EndTarotEvent khi quay xong.
     }
 
     // --- CHỌN LÁ BÀI NGẪU NHIÊN DỰA TRÊN TỶ TRỌNG ---
@@ -206,26 +221,6 @@ public class TarotCard : MonoBehaviour
         return allCardsData[0];
     }
 
-    // --- XỬ LÝ HIỆU ỨNG CỦA LÁ BÀI ĐÃ CHỌN ---
-    private void ActivateEffect(CardType card)
-    {
-        // ... (Logic giữ nguyên) ...
-        if (player == null || levelManager == null) return;
-        switch (card)
-        {
-            case CardType.TheFool: player.FullHeal(); player.DecreaseMaxHP(foolMaxHPDebuff); break;
-            case CardType.TheChariot: player.TryIncreaseMaxHP(chariotMaxHPBuff); break;
-            case CardType.Death: levelManager.ActivateGameOver(); break;
-            case CardType.TheDevil: player.IncreaseTarotBonusDamage(devilBonusDamage); player.IncreaseTarotDamageTakenMultiplier(devilDamageTakenMultiplier); break;
-            case CardType.TheWorld: levelManager.ActivateGameWin(); break;
-            case CardType.TheHangedMan: levelManager.SkipToNextBoss(); break;
-            case CardType.WheelOfFortune:
-                if (Random.value < 0.5f) levelManager.ActivateGameWin();
-                else levelManager.ActivateGameOver();
-                break;
-        }
-    }
-
     // --- KẾT THÚC SỰ KIỆN ---
     private void EndTarotEvent()
     {
@@ -234,8 +229,128 @@ public class TarotCard : MonoBehaviour
 
         if (astrologerCat != null) astrologerCat.StartExitRoutine();
 
-        if (levelManager != null) levelManager.ResumeGameAfterTarot();
+        // SỬA DÒNG NÀY: Dùng levelManager (viết thường) và ResumeGameAfterShop
+        if (levelManager != null)
+        {
+            levelManager.ResumeGameAfterShop();
+        }
 
         Destroy(gameObject);
+    }
+    [Header("== Cài Đặt Xúc Xắc (Wheel of Fortune) ==")]
+    public Sprite[] diceFaces; // Kéo 6 sprite mặt xúc xắc vào đây (từ 1 đến 6)
+    public float rollDuration = 3f;
+
+    private void ActivateEffect(CardType card)
+    {
+        if (player == null || levelManager == null) return;
+
+        switch (card)
+        {
+            case CardType.TheFool:
+                player.FullHeal();
+                player.DecreaseMaxHP(foolMaxHPDebuff);
+                EndTarotEvent();
+                break;
+
+            case CardType.TheChariot:
+                player.TryIncreaseMaxHP(chariotMaxHPBuff);
+                EndTarotEvent();
+                break;
+
+            case CardType.TheDevil:
+                player.IncreaseTarotBonusDamage(devilBonusDamage);
+                player.IncreaseTarotDamageTakenMultiplier(devilDamageTakenMultiplier);
+                EndTarotEvent();
+                break;
+
+            case CardType.TheHangedMan:
+                levelManager.SkipToNextBoss();
+                EndTarotEvent();
+                break;
+
+            case CardType.TheWorld:
+                levelManager.ActivateGameWin();
+                break;
+
+            case CardType.Death:
+                // MỚI: Mất 3 Shard thay vì thua game
+                Debug.Log("TAROT: Death - Losing 3 Stat Shards!");
+                if (ShopMenu.Instance != null) ShopMenu.Instance.DeathTarotPenalty();
+                EndTarotEvent();
+                break;
+
+            case CardType.WheelOfFortune:
+                // MỚI: Gọi Coroutine quay xúc xắc
+                StartCoroutine(RollDiceRoutine());
+                break;
+        }
+    }
+
+    IEnumerator RollDiceRoutine()
+    {
+        Debug.Log("DICE: Roll started..."); // Kiểm tra xem coroutine có chạy không
+        int finalResult = 0;
+        float startTime = Time.unscaledTime; // Dùng thời gian thực không phụ thuộc TimeScale
+        float currentInterval = 0.05f;
+
+        // Vòng lặp xoay xúc xắc
+        while (Time.unscaledTime - startTime < rollDuration)
+        {
+            finalResult = Random.Range(1, 7); // Random từ 1 đến 6
+
+            if (cardRenderer != null && diceFaces != null && diceFaces.Length >= 6)
+            {
+                cardRenderer.sprite = diceFaces[finalResult - 1];
+            }
+            else
+            {
+                Debug.LogError("DICE ERROR: Missing Sprite Renderer hoặc Dice Faces chưa gán đủ 6 mặt!");
+                yield break; // Thoát nếu thiếu asset
+            }
+
+            yield return new WaitForSecondsRealtime(currentInterval);
+
+            // Làm chậm dần tốc độ xoay
+            currentInterval = Mathf.Min(currentInterval + 0.03f, 0.5f);
+        }
+
+        Debug.Log("DICE: Stopped at number " + finalResult); // Xem kết quả cuối cùng
+
+        // 2. Kích hoạt hiệu ứng
+        ApplyDiceEffect(finalResult);
+
+        // 3. Chờ 1.5 giây để người chơi kịp nhìn con số cuối cùng
+        Debug.Log("DICE: Waiting to end event...");
+        yield return new WaitForSecondsRealtime(5f);
+        Debug.Log("DICE: Event Ended. Game Resumed.");
+    }
+
+    void ApplyDiceEffect(int result)
+    {
+        Debug.Log("APPLYING DICE EFFECT: " + result);
+
+        switch (result)
+        {
+            case 1:
+            case 2:
+                Debug.Log("Effect: Chaos Shard Reset");
+                if (ShopMenu.Instance != null) ShopMenu.Instance.DiceChaosReset();
+                else Debug.LogError("ShopMenu Instance is NULL!");
+                break;
+
+            case 3:
+            case 4:
+                Debug.Log("Effect: V-Split Shot");
+                player.isVSplitShot = true;
+                break;
+
+            case 5:
+            case 6:
+                Debug.Log("Effect: 100 Gold & Temp DMG");
+                player.AddGold(100);
+                player.StartCoroutine(player.TempDamageBuffRoutine(5, 150f));
+                break;
+        }
     }
 }

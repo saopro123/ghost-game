@@ -53,10 +53,14 @@ public class ShopCat : MonoBehaviour
     }
 
     // HÀM MỚI: Được gọi bởi LevelManager khi người chơi đóng shop
-    public void StartExit()
+    private bool shouldResumeOnExit = true; // Biến kiểm soát
+
+    public void StartExit(bool resume = true)
     {
+        shouldResumeOnExit = resume;
         StartCoroutine(ExitRoutine());
     }
+
 
     // ShopCat.cs
 
@@ -64,29 +68,25 @@ public class ShopCat : MonoBehaviour
     {
         Debug.Log("Shop Cat is leaving.");
 
-        // Di chuyển ra ngoài màn hình (Giữ nguyên logic di chuyển)
         Transform catTransform = transform;
         float timer = 0f;
-        // ... (logic tính exitPos và exitDuration) ...
         float exitDuration = moveDuration * 1.5f;
         Vector3 startPos = catTransform.position;
         Vector3 exitPos = new Vector3(-12f, startPos.y, startPos.z);
 
-
         while (timer < exitDuration)
         {
-            timer += Time.deltaTime;
+            // Nếu game đã Resume, mèo sẽ bay theo Time.deltaTime bình thường
+            // Nếu mở Blessing (shouldResumeOnExit = false), Time.timeScale vẫn = 0
+            // nên dùng unscaledDeltaTime để mèo vẫn bay đi được khi đang chọn Blessing
+            timer += Time.unscaledDeltaTime;
             float t = timer / exitDuration;
             catTransform.position = Vector3.Lerp(startPos, exitPos, t);
             yield return null;
         }
-         if (levelManager != null)
-          {
-             levelManager.ResumeGameAfterShop(); 
-             Debug.Log("Shop Cat called ResumeGameAfterShop. Spawn should restart.");
-          }
 
-        // Phá hủy Mèo Shop sau khi rời khỏi màn hình
+        // ĐÃ XÓA: Đoạn check shouldResumeOnExit và gọi ResumeGameAfterShop ở đây
+
         Destroy(gameObject);
     }
     public void PurchaseUpgrade(string upgradeType)

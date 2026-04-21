@@ -28,7 +28,7 @@ public class PlayerBullet : MonoBehaviour
         // Thiết lập vận tốc ban đầu (bay sang phải)
         if (rb != null)
         {
-            rb.linearVelocity = Vector2.right * speed;
+            rb.linearVelocity = transform.right * speed;
         }
 
         Destroy(gameObject, lifetime);
@@ -41,18 +41,19 @@ public class PlayerBullet : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        // Kiểm tra Tag: Đạn chỉ tương tác với vật thể có Tag "Enemy"
         if (other.CompareTag("Enemy"))
         {
             Enemy enemy = other.GetComponent<Enemy>();
-
             if (enemy != null)
             {
-                // Gọi hàm TakeDamage() của Enemy (hoặc Boss)
-                enemy.TakeDamage(damage);
-            }
+                enemy.TakeDamage(damage, false);
 
-            // Tự hủy đạn sau khi va chạm
+                // NẾU ĐANG CÓ BUFF NỔ: Tạo vụ nổ ngay lập tức
+                if (Player.Instance.isExplosiveRoundsActive)
+                {
+                    Instantiate(Player.Instance.explosionPrefab, transform.position, Quaternion.identity);
+                }
+            }
             Destroy(gameObject);
         }
     }

@@ -176,7 +176,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dc766427d0e700e43ba5acfc46a4615b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHealth: 400
+  maxHealth: 1200
   currentHealth: 0
   contactDamage: 10
   isBoss: 1
@@ -188,6 +188,7 @@ MonoBehaviour:
   hitFlashDuration: 0.05
   hitFlashCount: 1
   deathFadeDuration: 1
+  pickupPrefabs: []
   bossBulletPrefab: {fileID: 7683735423314721568, guid: c34bd332a14bb8b41b9a8d98520eadf8, type: 3}
   bossBulletSpeed: 7
   baseAttackRate: 1.2

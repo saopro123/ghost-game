@@ -225,16 +225,14 @@ public class EgyptianCatBoss : Enemy
     // --- DAMAGE CONTROL (QUAN TRỌNG) ---
     // ==========================================================
 
-    public override void TakeDamage(int damageAmount)
+    public override void TakeDamage(int damageAmount, bool isFromExplosion = false)
     {
-        // 🆕 Gán Feedback khi bị tấn công trong trạng thái dễ tổn thương
         if (isVulnerable)
         {
-            // Ví dụ: Nháy sáng khi bị tấn công
             StartCoroutine(FlashDamage(Color.red, 0.1f));
-            base.TakeDamage(damageAmount);
+            // Truyền đủ 2 tham số vào base
+            base.TakeDamage(damageAmount, isFromExplosion);
         }
-        // else: Boss không nhận sát thương
     }
 
     // 🆕 HÀM MỚI: Feedback hình ảnh khi nhận sát thương

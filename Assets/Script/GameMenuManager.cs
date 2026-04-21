@@ -1,220 +1,179 @@
 ﻿using UnityEngine;
 using UnityEngine.SceneManagement;
 using System.Collections;
+using UnityEngine.EventSystems;
+using System.Runtime.InteropServices; // THÊM THƯ VIỆN NÀY
 
 public class GameMenuManager : MonoBehaviour
 {
-    // Enum định nghĩa các trạng thái game có thể có
-    public enum GameState
-    {
-        MainMenu,
-        Playing,
-        Paused,
-        GameOver,
-        GameWin
-    }
+    // ==========================================================
+    // ** CẦU NỐI JAVASCRIPT (CHỈ CHẠY TRÊN WEBGL) **
+    // ==========================================================
+#if !UNITY_EDITOR && UNITY_WEBGL
+    [DllImport("__Internal")]
+    private static extern void SaveScoreToWeb(int score);
+#endif
 
-    // Trạng thái game hiện tại
+    public enum GameState { MainMenu, Playing, Paused, GameOver, GameWin }
     public static GameState CurrentState { get; private set; } = GameState.MainMenu;
 
     [Header("== UI Canvas References ==")]
-    [Tooltip("Gán Canvas Main Menu vào đây")]
     public GameObject mainMenuCanvas;
-    [Tooltip("Gán Canvas Pause Menu vào đây")]
     public GameObject pauseMenuCanvas;
-    [Tooltip("Gán Canvas Game Over vào đây")]
     public GameObject gameOverCanvas;
-    [Tooltip("Gán Canvas Game Win vào đây")]
     public GameObject gameWinCanvas;
 
-    // Tham chiếu tĩnh để dễ dàng gọi từ các script khác
-    public static GameMenuManager Instance { get; private set; }
+    [Header("== Transition Settings ==")]
+    [Tooltip("Thời gian menu biến mất từ từ")]
+    public float fadeDuration = 0.4f;
+    private bool isTransitioning = false;
 
-    // Đã loại bỏ biến tĩnh "shouldStartPlaying"
+    public static GameMenuManager Instance { get; private set; }
 
     void Awake()
     {
-        // Thiết lập Singleton
-        if (Instance == null)
-        {
-            Instance = this;
-            // 🛑 ĐÃ XÓA: DontDestroyOnLoad(gameObject);
-            // Manager này sẽ bị hủy khi Scene bị tải lại (nhưng chúng ta không tải lại nữa!)
-        }
-        else
-        {
-            Destroy(gameObject);
-            return;
-        }
+        if (Instance == null) Instance = this;
+        else { Destroy(gameObject); return; }
 
-        // Bắt đầu game ở trạng thái Main Menu, đảm bảo Time.timeScale = 0f
         SetState(GameState.MainMenu);
     }
 
-    // Logic bắt input thô (Raw Input)
     void Update()
     {
+        if (isTransitioning) return;
+
         bool isInputDetected = false;
-
-        // PC/Editor Click (Chuột trái)
-        if (Input.GetMouseButtonDown(0))
-        {
-            isInputDetected = true;
-        }
-
-        // Mobile Touch (Chạm đầu tiên)
-        if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)
-        {
-            isInputDetected = true;
-        }
+        if (Input.GetMouseButtonDown(0)) isInputDetected = true;
+        if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began) isInputDetected = true;
 
         if (isInputDetected)
         {
-            HandleScreenTap();
+            if (CurrentState == GameState.MainMenu || CurrentState == GameState.GameOver || CurrentState == GameState.GameWin)
+            {
+                HandleScreenTap();
+            }
+            else if (CurrentState == GameState.Paused)
+            {
+                bool isShopActive = ShopMenu.Instance != null && ShopMenu.Instance.gameObject.activeInHierarchy;
+                bool isBlessingActive = BlessingMenu.Instance != null && BlessingMenu.Instance.IsShowing;
+
+                if (!isShopActive && !isBlessingActive)
+                {
+                    HandleScreenTap();
+                }
+            }
         }
     }
-
-    // ==========================================================
-    // ** LOGIC QUẢN LÝ TRẠNG THÁI **
-    // ==========================================================
-
-    private void SetState(GameState newState)
-    {
-        CurrentState = newState;
-
-        // 1. Ẩn tất cả Canvas Menu
-        if (mainMenuCanvas != null) mainMenuCanvas.SetActive(false);
-        if (pauseMenuCanvas != null) pauseMenuCanvas.SetActive(false);
-        if (gameOverCanvas != null) gameOverCanvas.SetActive(false);
-        if (gameWinCanvas != null) gameWinCanvas.SetActive(false);
-
-        // 2. Xử lý logic theo từng trạng thái mới
-        switch (newState)
-        {
-            case GameState.MainMenu:
-                if (mainMenuCanvas != null) mainMenuCanvas.SetActive(true);
-                Time.timeScale = 0f; // Dừng game
-                Debug.Log("Game State: Main Menu");
-                break;
-
-            case GameState.Playing:
-                // 🛑 QUAN TRỌNG: Chỉ cần đặt TimeScale = 1f và tất cả Canvas Menu đã bị ẩn.
-                Time.timeScale = 1f;
-                Debug.Log("Game State: Playing");
-                break;
-
-            case GameState.Paused:
-                if (pauseMenuCanvas != null) pauseMenuCanvas.SetActive(true);
-                Time.timeScale = 0f; // Dừng game
-                Debug.Log("Game State: Paused");
-                break;
-
-            case GameState.GameOver:
-                if (gameOverCanvas != null) gameOverCanvas.SetActive(true);
-                Time.timeScale = 0f; // Dừng game
-                Debug.Log("Game State: Game Over");
-                break;
-
-            case GameState.GameWin:
-                if (gameWinCanvas != null) gameWinCanvas.SetActive(true);
-                Time.timeScale = 0f; // Dừng game
-                Debug.Log("Game State: Game Win");
-                break;
-        }
-    }
-
-    // ==========================================================
-    // ** CÁC HÀM XỬ LÝ SỰ KIỆN CHÍNH **
-    // ==========================================================
 
     public void HandleScreenTap()
     {
         switch (CurrentState)
         {
-            // Khi đang ở MainMenu, chuyển thẳng sang Playing
             case GameState.MainMenu:
-                StartGame();
+                StartCoroutine(FadeAndAction(mainMenuCanvas, () => StartGame()));
                 break;
-
             case GameState.Paused:
-                ResumeGame();
+                StartCoroutine(FadeAndAction(pauseMenuCanvas, () => ResumeGame()));
                 break;
-
             case GameState.GameOver:
             case GameState.GameWin:
-                RestartGame();
+                GameObject activeCanvas = (CurrentState == GameState.GameOver) ? gameOverCanvas : gameWinCanvas;
+                StartCoroutine(FadeAndAction(activeCanvas, () => RestartGame()));
                 break;
         }
     }
 
-    public void StartGame()
+    IEnumerator FadeAndAction(GameObject canvasObj, System.Action action)
     {
-        // 🛑 ĐƠN GIẢN HÓA: Chỉ cần chuyển trạng thái
-        SetState(GameState.Playing);
-    }
-
-    public void RestartGame()
-    {
-        // 🛑 LƯU Ý: Nếu không tải lại Scene, bạn phải thêm logic Reset game tại đây.
-        // Ví dụ: Player.Instance.ResetStats(); LevelManager.Instance.ResetLevel();
-        // Hiện tại, nó chỉ ẩn UI và tiếp tục game (vì game time đã dừng ở Game Over/Win).
-
-        // 🛑 Để Restart đúng nghĩa, bạn CẦN TẢI LẠI SCENE. 
-        // Nếu không muốn tải lại, bạn phải tự code hàm Reset cho mọi thứ (Player, Enemies, Score, etc.)
-
-        // GIỮ PHƯƠNG PHÁP TẢI LẠI CHO RESTART
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
-        // Khi Scene tải lại, Awake() sẽ chạy và đưa game về MainMenu, chờ StartGame()
-
-        // ⚠️ Lưu ý: Nếu bạn dùng StartGame() ở đây, bạn sẽ không reset được Scene!
-        // Để đơn giản, ta vẫn dùng Scene Load ở đây.
-    }
-
-    public void PauseGame()
-    {
-        if (CurrentState == GameState.Playing)
+        isTransitioning = true;
+        CanvasGroup cg = canvasObj.GetComponent<CanvasGroup>();
+        if (cg != null)
         {
-            SetState(GameState.Paused);
+            float timer = 0;
+            while (timer < fadeDuration)
+            {
+                timer += Time.unscaledDeltaTime;
+                cg.alpha = Mathf.Lerp(1f, 0f, timer / fadeDuration);
+                yield return null;
+            }
         }
+        action.Invoke();
+        isTransitioning = false;
     }
 
-    public void ResumeGame()
-    {
-        if (CurrentState == GameState.Paused)
-        {
-            SetState(GameState.Playing);
-        }
-    }
+    public void StartGame() { SetState(GameState.Playing); }
 
+    public void RestartGame() { SceneManager.LoadScene(SceneManager.GetActiveScene().name); }
+
+    public void PauseGame() { if (CurrentState == GameState.Playing) SetState(GameState.Paused); }
+
+    public void ResumeGame() { if (CurrentState == GameState.Paused) SetState(GameState.Playing); }
+
+    // --- Cập nhật GameOver để gửi điểm ---
     public void GameOver()
     {
         if (CurrentState == GameState.Playing || CurrentState == GameState.Paused)
         {
             SetState(GameState.GameOver);
+            SendFinalScoreToWeb(); // Gửi điểm số
         }
     }
 
+    // --- Cập nhật GameWin để gửi điểm ---
     public void GameWin()
     {
         if (CurrentState == GameState.Playing || CurrentState == GameState.Paused)
         {
             SetState(GameState.GameWin);
+            SendFinalScoreToWeb(); // Gửi điểm số
         }
     }
-    // --- Thêm vào GameMenuManager.cs ---
 
-    // HÀM MỚI: Tạm dừng game nhưng KHÔNG hiển thị Pause Menu
+    // HÀM BỔ TRỢ: Lấy điểm từ Player và gửi sang JS
+    private void SendFinalScoreToWeb()
+    {
+#if !UNITY_EDITOR && UNITY_WEBGL
+        if (Player.Instance != null)
+        {
+            int score = Player.Instance.totalGold; // Lấy tổng vàng làm điểm
+            SaveScoreToWeb(score);
+            Debug.Log("Score sent to React: " + score);
+        }
+#endif
+    }
+
     public void PauseGameForEvent()
     {
-        // Chỉ tạm dừng nếu game đang chạy
         if (CurrentState == GameState.Playing)
         {
-            // Chuyển sang trạng thái Paused, nhưng không gọi SetState
-            // để tránh việc SetState() hiển thị pauseMenuCanvas
-
             CurrentState = GameState.Paused;
             Time.timeScale = 0f;
-            Debug.Log("Game State: Paused for Event (No UI)");
+        }
+    }
+
+    private void SetState(GameState newState)
+    {
+        CurrentState = newState;
+        if (mainMenuCanvas != null) SetupCanvas(mainMenuCanvas, newState == GameState.MainMenu);
+        if (pauseMenuCanvas != null) SetupCanvas(pauseMenuCanvas, newState == GameState.Paused);
+        if (gameOverCanvas != null) SetupCanvas(gameOverCanvas, newState == GameState.GameOver);
+        if (gameWinCanvas != null) SetupCanvas(gameWinCanvas, newState == GameState.GameWin);
+
+        if (AudioManager.Instance != null)
+        {
+            if (newState == GameState.GameOver || newState == GameState.GameWin) AudioManager.Instance.StopMusic();
+            else if (newState == GameState.Playing) AudioManager.Instance.PlayMainMusic();
+        }
+        Time.timeScale = (newState == GameState.Playing) ? 1f : 0f;
+    }
+
+    void SetupCanvas(GameObject go, bool active)
+    {
+        go.SetActive(active);
+        if (active)
+        {
+            CanvasGroup cg = go.GetComponent<CanvasGroup>();
+            if (cg != null) cg.alpha = 1f;
         }
     }
 }

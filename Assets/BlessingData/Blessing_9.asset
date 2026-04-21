@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dd09717bfd0d3ea46864cc9af4f3ab4f, type: 3}
+  m_Name: Blessing_9
+  m_EditorClassIdentifier: 
+  blessingName: Midas's Curse
+  description: "K\u1EBB \u0111\u1ECBch s\u1EBD r\u01A1i th\xEAm 50% v\xE0ng, tuy
+    nhi\xEAn m\xE1u c\u1EE7a ch\xFAng c\u0169ng \u0111\u01B0\u1EE3c t\u0103ng th\xEAm
+    20%."
+  cardFace: {fileID: 21300000, guid: d72d72557faf9ec4ba4a80164f40b8d6, type: 3}
+  type: 2
+  id: 9

@@ -1,5 +1,5 @@
 ﻿using UnityEngine;
-using UnityEngine.UI; // Dùng cho Text (Legacy)
+using UnityEngine.UI;
 using System.Collections.Generic;
 
 public class ShopMenu : MonoBehaviour
@@ -9,176 +9,310 @@ public class ShopMenu : MonoBehaviour
     private UIManager uiManager;
 
     [Header("== Cài Đặt Giá Cơ Bản ==")]
-    [Tooltip("Text Component (Legacy) hiển thị số Gold của người chơi")]
     public Text goldDisplay;
+    public int basePrice = 70;
+    public int priceIncreasePerPurchase = 30;
 
-    public int basePrice = 70; // Giá mua lần đầu
-    public int priceIncreasePerPurchase = 30; // Giá tăng thêm sau mỗi lần mua
+    [Header("== Quy Tắc 7 Shard ==")]
+    [Tooltip("Text hiển thị số lượng Shard đã mua (ví dụ: Shards: 0/7)")]
+    public Text shardCounterText;
+    private static int totalShardsBought = 0; // Lưu tổng số shard đã mua toàn game
+    private const int MAX_SHARDS = 7;
 
-    // Dictionary TĨNH (static): Lưu số lần mua của mỗi vật phẩm. 
+    [Header("== Mua Blessing ==")]
+    public int blessingPrice = 100;
+    public Text blessingPriceText; // Hiển thị giá 100 gold lên nút
+    public static int bonusShardsCount = 0;
+
     private static Dictionary<string, int> purchaseCount = new Dictionary<string, int>()
     {
-        {"ATK_UP", 0},
-        {"MAX_HP_UP", 0},
-        {"AMOUNT_UP", 0},
-        {"FIRE_RATE_UP", 0},
-        {"LUCK_UP", 0}
+        {"ATK_UP", 0}, {"MAX_HP_UP", 0}, {"AMOUNT_UP", 0}, {"FIRE_RATE_UP", 0}, {"LUCK_UP", 0}
     };
 
-    // Giới hạn mua của mỗi vật phẩm
     private Dictionary<string, int> maxPurchases = new Dictionary<string, int>()
     {
-        {"ATK_UP", 7},
-        {"MAX_HP_UP", 4},
-        {"AMOUNT_UP", 5},
-        {"FIRE_RATE_UP", 4},
-        {"LUCK_UP", 4}
+        {"ATK_UP", 7}, {"MAX_HP_UP", 4}, {"AMOUNT_UP", 5}, {"FIRE_RATE_UP", 4}, {"LUCK_UP", 4}
     };
+    public static ShopMenu Instance;
 
+    void Awake()
+    {
+        Instance = this;
 
+        // --- RESET DỮ LIỆU KHI NEW GAME ---
+        totalShardsBought = 0;
+        bonusShardsCount = 0;
+
+        // Reset toàn bộ số lượng mua của từng món về 0
+        // Cần tạo một danh sách tạm để tránh lỗi "Collection was modified"
+        List<string> keys = new List<string>(purchaseCount.Keys);
+        foreach (string key in keys)
+        {
+            purchaseCount[key] = 0;
+        }
+
+        Debug.Log("Shop Data Reset for New Game");
+    }
     public void Initialize(ShopCat cat)
     {
-        // TÌM CÁC THAM CHIẾU CẦN THIẾT
         levelManager = FindAnyObjectByType<LevelManager>();
         player = FindAnyObjectByType<Player>();
-        uiManager = UIManager.Instance; // Lấy Singleton
+        uiManager = UIManager.Instance;
 
-        if (levelManager == null || player == null || uiManager == null)
-        {
-            Debug.LogError("LevelManager, Player HOẶC UIManager bị thiếu!");
-            // Gọi HideShopMenu để dọn dẹp (nếu có thể)
-            if (levelManager != null) levelManager.HideShopMenu();
-            else gameObject.SetActive(false);
-            return;
-        }
+        if (levelManager == null || player == null || uiManager == null) return;
 
-        // Hiển thị Gold ngay khi mở shop
         UpdateGoldDisplay();
+        UpdateShardDisplay();
+        UpdateAllPriceTexts(); // Thêm dòng này để hiện giá ngay khi mở shop
 
-        // 🛑 ĐÃ BỎ: KHÔNG DỪNG GAME
-        Debug.Log("Shop Menu Initialized.");
+        if (blessingPriceText != null)
+        {
+            int currentBlessingPrice = player.hasFateDiscount ? Mathf.RoundToInt(blessingPrice * 0.7f) : blessingPrice;
+            blessingPriceText.text = currentBlessingPrice.ToString() + "G";
+        }
     }
 
-    // Cập nhật hiển thị Gold (chỉ cho Shop UI)
     private void UpdateGoldDisplay()
     {
-        if (goldDisplay != null)
-        {
-            goldDisplay.text = player.totalGold.ToString();
-        }
+        if (goldDisplay != null) goldDisplay.text = player.totalGold.ToString();
     }
 
-    // Tính giá hiện tại của một vật phẩm
+    private void UpdateShardDisplay()
+    {
+        if (shardCounterText != null)
+            shardCounterText.text = "Shards: " + totalShardsBought + "/" + MAX_SHARDS;
+    }
+
     private int GetCurrentPrice(string upgradeKey)
     {
-        int count = purchaseCount[upgradeKey];
-        return basePrice + (count * priceIncreasePerPurchase);
+        // Lấy TỔNG số shard đã mua từ trước đến giờ để tính giá chung
+        // Ví dụ: đã mua 1 lần ATK và 1 lần HP -> tổng là 2.
+        // Lần mua thứ 3 (bất kỳ món nào) sẽ tính dựa trên số 2 này.
+        int globalCount = totalShardsBought;
+
+        int currentPrice = basePrice + (globalCount * priceIncreasePerPurchase);
+
+        // Áp dụng giảm giá 30% nếu có thẻ Fate's Discount (ID 11)
+        if (player != null && player.hasFateDiscount)
+        {
+            return Mathf.RoundToInt(currentPrice * 0.7f);
+        }
+
+        return currentPrice;
     }
 
-    // Xử lý logic mua chung: Kiểm tra tiền, kiểm tra giới hạn, trừ tiền và tăng số lần mua
     private bool TryPurchase(string upgradeKey, int healAmountIfMaxed)
     {
-        int price = GetCurrentPrice(upgradeKey);
-        int max = maxPurchases[upgradeKey];
-        bool isMaxed = purchaseCount[upgradeKey] >= max;
-
-        // 1. Kiểm tra giới hạn mua (Nếu đã đạt max)
-        if (isMaxed)
+        // 1. Kiểm tra giới hạn TỔNG 7 SHARD trước
+        if (totalShardsBought >= MAX_SHARDS && !player.isMysticSynergy)
         {
-            Debug.Log($"Đã đạt giới hạn mua {upgradeKey} ({max} lần). Chỉ hồi HP.");
-
+            Debug.Log("Đã đạt giới hạn 7 Shard toàn game! Chỉ hồi HP.");
             player.Heal(healAmountIfMaxed);
-
-            // CẬP NHẬT PURIFICATION CHÍNH SAU KHI HEAL
-            if (uiManager != null) uiManager.UpdatePurificationMeter(player.currentPurification);
-
-            // Cập nhật lại Gold Display (chỉ để refresh)
-            UpdateGoldDisplay();
+            if (uiManager != null) uiManager.UpdatePurificationMeter(player.currentPurification, player.maxPurification);
             return false;
         }
 
-        // 2. Kiểm tra tiền (Chỉ kiểm tra nếu chưa đạt giới hạn)
-        if (player.totalGold < price)
+        int price = GetCurrentPrice(upgradeKey);
+
+        // 2. Kiểm tra giới hạn riêng của từng món
+        if (purchaseCount[upgradeKey] >= maxPurchases[upgradeKey])
         {
-            Debug.LogWarning($"Không đủ tiền mua {upgradeKey}. Cần: {price}, Hiện có: {player.totalGold}");
+            player.Heal(healAmountIfMaxed);
             return false;
         }
 
-        // 3. Mua thành công: Trừ tiền, Tăng số lần mua, Cập nhật UI
+        // 3. Kiểm tra tiền
+        if (player.totalGold < price) return false;
 
-        // TRỪ TIỀN
+        // THỰC HIỆN MUA
         player.totalGold -= price;
-
-        // TĂNG SỐ LẦN MUA
         purchaseCount[upgradeKey]++;
+        totalShardsBought++; // Tăng tổng số shard
 
-        // Cập nhật UI Shop
         UpdateGoldDisplay();
-
-        // 🛑 CẬP NHẬT UI CHÍNH! (Sửa lỗi đồng bộ Gold)
-        if (uiManager != null)
-        {
-            uiManager.UpdateGoldDisplay(player.totalGold);
-        }
+        UpdateShardDisplay();
+        UpdateAllPriceTexts();
+        if (uiManager != null) uiManager.UpdateGoldDisplay(player.totalGold);
 
         return true;
     }
 
-    // --- CÁC HÀM GÁN VÀO NÚT BUY ---
+    // --- CÁC NÚT BẤM ---
+    public void OnBuyAttackUp() { if (TryPurchase("ATK_UP", 25)) player.IncreaseDamage(5); }
+    public void OnBuyMaxHpUp() { if (TryPurchase("MAX_HP_UP", 25)) player.TryIncreaseMaxHP(25); }
+    public void OnBuyLuckUp() { if (TryPurchase("LUCK_UP", 25)) player.IncreaseLuck(0.1f); }
+    public void OnBuyFireRateUp() { if (TryPurchase("FIRE_RATE_UP", 25)) player.IncreaseFireRate(0.02f); }
+    public void OnBuyAmountUp() { if (TryPurchase("AMOUNT_UP", 25)) player.IncreaseProjectileAmount(1); }
 
-    public void OnBuyAttackUp()
+    // --- NÚT MUA BLESSING MỚI ---
+    public void OnBuyBlessing()
     {
-        if (TryPurchase("ATK_UP", 25))
+        int currentBlessingPrice = player.hasFateDiscount ? Mathf.RoundToInt(blessingPrice * 0.7f) : blessingPrice;
+
+        if (player.totalGold >= currentBlessingPrice)
         {
-            player.IncreaseDamage(5);
+            player.totalGold -= currentBlessingPrice;
+            UpdateGoldDisplay();
+
+            // 1. Tắt UI Shop ngay lập tức
+            // 2. Gọi HideShopMenu và bảo nó KHÔNG ĐƯỢC Resume game (false)
+            levelManager.HideShopMenu(false);
+
+            // 3. Kiểm tra an toàn trước khi gọi Blessing
+            if (BlessingMenu.Instance != null)
+            {
+                BlessingMenu.Instance.ShowBlessingSelection();
+            }
+            else
+            {
+                Debug.LogError("BlessingMenu Instance is NULL! Check if the object is active in Hierarchy.");
+                // Nếu lỗi thì phải cứu vãn bằng cách resume game
+                levelManager.ResumeGameAfterShop();
+            }
         }
     }
 
-    public void OnBuyMaxHpUp()
-    {
-        if (TryPurchase("MAX_HP_UP", 25))
-        {
-            player.TryIncreaseMaxHP(25);
-        }
-    }
-
-    public void OnBuyLuckUp()
-    {
-        if (TryPurchase("LUCK_UP", 25))
-        {
-            player.IncreaseLuck(0.1f);
-        }
-    }
-
-    public void OnBuyFireRateUp()
-    {
-        if (TryPurchase("FIRE_RATE_UP", 25))
-        {
-            player.IncreaseFireRate(0.02f);
-        }
-    }
-
-    public void OnBuyAmountUp()
-    {
-        if (TryPurchase("AMOUNT_UP", 25))
-        {
-            player.IncreaseProjectileAmount(1);
-        }
-    }
-
-    // Gán vào nút Close
     public void OnCloseButtonClicked()
     {
-        if (levelManager != null)
+        if (levelManager != null) levelManager.HideShopMenu();
+    }
+    // Hàm tặng Shard ngẫu nhiên (Dùng cho sự kiện Xanh lá)
+    public void AddRandomShard(bool isBonus)
+    {
+        // Lấy danh sách các loại nâng cấp
+        List<string> keys = new List<string>(purchaseCount.Keys);
+        string randomKey = keys[Random.Range(0, keys.Count)];
+
+        // Tăng chỉ số trong dữ liệu Shop
+        purchaseCount[randomKey]++;
+
+        if (!isBonus) totalShardsBought++;
+
+        // Áp dụng chỉ số đó vào Player ngay lập tức
+        if (player == null) player = Player.Instance;
+
+        if (randomKey == "ATK_UP") player.IncreaseDamage(5);
+        else if (randomKey == "MAX_HP_UP") player.TryIncreaseMaxHP(25);
+        else if (randomKey == "LUCK_UP") player.IncreaseLuck(0.1f);
+        else if (randomKey == "FIRE_RATE_UP") player.IncreaseFireRate(0.02f);
+        else if (randomKey == "AMOUNT_UP") player.IncreaseProjectileAmount(1);
+
+        UpdateShardDisplay();
+    }
+
+    // Hàm trung gian để áp dụng chỉ số từ Key sang Player
+    public void ApplyStatToPlayer(string upgradeKey)
+    {
+        // Đảm bảo player không null
+        if (player == null) player = Player.Instance;
+        if (player == null) return;
+
+        switch (upgradeKey)
         {
-            // LevelManager sẽ lo việc hủy Mèo Shop và gọi ResumeGameAfterShop()
-            levelManager.HideShopMenu();
+            case "ATK_UP": player.IncreaseDamage(5); break;
+            case "MAX_HP_UP": player.TryIncreaseMaxHP(25); break;
+            case "LUCK_UP": player.IncreaseLuck(0.1f); break;
+            case "FIRE_RATE_UP": player.IncreaseFireRate(0.02f); break;
+            case "AMOUNT_UP": player.IncreaseProjectileAmount(1); break;
         }
-        else
+    }
+
+    // Dùng cho Xúc xắc 1 & 2 (Wheel of Fortune)
+    public void DiceChaosReset()
+    {
+        // 1. Tính tổng shard hiện có và cộng thêm 2
+        int totalToDistribute = totalShardsBought + 2;
+        totalToDistribute = Mathf.Min(totalToDistribute, 7); // Giới hạn 7 (hoặc tùy bạn)
+
+        // 2. Reset Player về chỉ số gốc (để tính lại từ đầu, tránh cộng dồn lỗi)
+        player.ResetStatsToBase();
+
+        // 3. Xóa sạch dictionary shard hiện tại
+        List<string> keys = new List<string>(purchaseCount.Keys);
+        foreach (string k in keys) purchaseCount[k] = 0;
+
+        // 4. Chia lại ngẫu nhiên
+        for (int i = 0; i < totalToDistribute; i++)
         {
-            // Trường hợp lỗi (Không tìm thấy LevelManager)
-            gameObject.SetActive(false);
-            Debug.LogWarning("Không tìm thấy LevelManager. Chỉ ẩn menu.");
+            string rKey = keys[Random.Range(0, keys.Count)];
+            purchaseCount[rKey]++;
+            ApplyStatToPlayer(rKey); // Áp dụng chỉ số mới
         }
+
+        totalShardsBought = totalToDistribute;
+        UpdateShardDisplay();
+    }
+
+    public void DeathTarotPenalty()
+    {
+        // Nếu chưa mua cái gì thì không trừ, tránh lỗi logic
+        if (totalShardsBought <= 0)
+        {
+            Debug.Log("No shards to lose!");
+            return;
+        }
+
+        for (int i = 0; i < 3; i++)
+        {
+            if (totalShardsBought <= 0) break;
+
+            List<string> ownedKeys = new List<string>();
+            foreach (var pair in purchaseCount)
+            {
+                if (pair.Value > 0) ownedKeys.Add(pair.Key);
+            }
+
+            if (ownedKeys.Count > 0)
+            {
+                string rKey = ownedKeys[Random.Range(0, ownedKeys.Count)];
+                purchaseCount[rKey]--;
+                totalShardsBought--;
+            }
+        }
+
+        RefreshPlayerStats();
+    }
+
+    private void RefreshPlayerStats()
+    {
+        // Đảm bảo player không null trước khi dùng
+        if (player == null) player = Player.Instance;
+        if (player == null) return; // Nếu vẫn null thì thoát để tránh crash
+
+        player.ResetStatsToBase();
+        foreach (var pair in purchaseCount)
+        {
+            for (int i = 0; i < pair.Value; i++)
+            {
+                ApplyStatToPlayer(pair.Key);
+            }
+        }
+    }
+    [Header("== Price Display Text (Legacy Text) ==")]
+    public Text atkPriceText;
+    public Text hpPriceText;
+    public Text luckPriceText;
+    public Text fireRatePriceText;
+    public Text amountPriceText;
+
+    // Hàm cập nhật toàn bộ chữ hiển thị giá trên UI
+    private void UpdateAllPriceTexts()
+    {
+        atkPriceText.text = GetPriceDisplay("ATK_UP");
+        hpPriceText.text = GetPriceDisplay("MAX_HP_UP");
+        luckPriceText.text = GetPriceDisplay("LUCK_UP");
+        fireRatePriceText.text = GetPriceDisplay("FIRE_RATE_UP");
+        amountPriceText.text = GetPriceDisplay("AMOUNT_UP");
+    }
+    private string GetPriceDisplay(string key)
+    {
+        // Kiểm tra nếu đã đạt giới hạn mua của món đó
+        if (purchaseCount[key] >= maxPurchases[key])
+        {
+            return "MAX";
+        }
+
+        // Nếu chưa đạt giới hạn, lấy giá hiện tại
+        return GetCurrentPrice(key).ToString() + "G";
     }
 }

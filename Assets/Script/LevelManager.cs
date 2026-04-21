@@ -1,468 +1,496 @@
 ﻿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using static GameMenuManager;
 
 public class LevelManager : MonoBehaviour
 {
-    [Header("== Cài Đặt Quái Thường ==")]
-    [Tooltip("Danh sách Prefab của các loại quái thường.")]
-    public GameObject[] regularEnemyPrefabs;
-    [Tooltip("Tỷ lệ spawn quái thường BAN ĐẦU (quái/giây).")]
-    public float initialSpawnRate = 1.5f; // Tỷ lệ spawn ban đầu
+    public static LevelManager Instance;
 
-    // 🆕 CÀI ĐẶT TĂNG TỶ LỆ SPAWN
-    [Header("== Cài Đặt Tăng Tỷ Lệ Spawn ==")]
-    [Tooltip("Tỷ lệ spawn TỐI ĐA có thể đạt được.")]
-    public float maxSpawnRate = 5.0f;
-    [Tooltip("Thời gian (giây) để tỷ lệ spawn đạt mức tối đa.")]
-    public float timeToReachMaxRate = 180f; // Đạt max rate sau 3 phút
-
-    [Header("== Cài Đặt Boss Tuần Tự ==")]
-    [Tooltip("Danh sách Prefab của các Boss, sẽ xuất hiện tuần tự.")]
-    public GameObject[] bossPrefabs;
-    [Tooltip("Thời gian giữa các lần spawn Boss (giây).")]
-    public float bossInterval = 180f;
-    [Tooltip("Vị trí Boss sẽ bay đến và dừng lại (Tọa độ X, Y trong màn hình).")]
-    public Vector2 bossStopPosition = new Vector2(8f, 0f);
-
-    // BIẾN MỚI CHO TAROT
-    [Tooltip("Vị trí Mèo Tarot sẽ dừng lại (thường giống Boss).")]
-    public Vector2 catStopPosition = new Vector2(8f, 0f);
-
-    [Header("== Cài Đặt Sự Kiện Sau Boss ==")]
-    [Tooltip("Prefab Mèo Bán Hàng.")]
-    public GameObject shopCatPrefab;
-    [Tooltip("Prefab Mèo Chiêm Tinh.")]
-    public GameObject astrologerCatPrefab;
-    [Tooltip("Canvas Shop Menu (Đã có sẵn trong Scene và bị Disable).")]
-    public GameObject shopMenuCanvas;
-    [Tooltip("Tỉ lệ Mèo Chiêm Tinh xuất hiện (0.1 = 10%).")]
-    [Range(0f, 1f)]
-    public float astrologerChance = 0.1f;
-
-    // PREFAB TAROT CARD
-    [Header("== Cài Đặt Tarot ==")]
-    [Tooltip("Prefab của Tarot Card Manager/Object (dùng để sinh ngẫu nhiên và hiển thị lá bài).")]
-    public GameObject tarotCardPrefab;
-
-    [Header("== Cài Đặt Khu Vực Spawn ==")]
-    [Tooltip("Khoảng Y tối thiểu và tối đa để spawn quái thường.")]
-    public Vector2 spawnYRange = new Vector2(-5f, 5f);
-
-    // ==========================================================
-    // ** BIẾN TỐI ƯU HÓA **
-    // ==========================================================
-    private List<GameObject> preInstantiatedBosses = new List<GameObject>();
-    // ==========================================================
-
-    private float bossTimer;
-    private bool isBossActive = false;
-    private Coroutine regularSpawnCoroutine;
-    private Coroutine spawnRateIncreaseCoroutine;
-    private float currentSpawnRate;
-    private int currentBossIndex = 0;
-
-    // BIẾN TRẠNG THÁI
-    private bool isHandlingTarotEvent = false;
-
-    private ShopCat activeShopCat;
+    [Header("== References ==")]
     private Player player;
     private GameMenuManager gameMenuManager;
+    public UnityEngine.UI.Image backgroundUI;
 
+    [Header("== Enemy Prefabs ==")]
+    public GameObject[] regularEnemyPrefabs;
+    public GameObject[] bossPrefabs;
+    public GameObject frostEnemyPrefab;
+    public GameObject shielderPrefab;
+    public GameObject goldenCoinPrefab;
+    public GameObject catGhostPrefab;
+
+    [Header("== Story Prefabs ==")]
+    public GameObject angelNPCPrefab;
+    public GameObject superAngelBossPrefab;
+    public GameObject heavenGatePrefab;
+
+    [Header("== Spawn Settings ==")]
+    public float initialSpawnRate = 1.5f;
+    public float maxSpawnRate = 5.0f;
+    public float timeToReachMaxRate = 180f;
+    public Vector2 spawnYRange = new Vector2(-4f, 4f);
+    public float bossInterval = 180f;
+    public Vector2 bossStopPosition = new Vector2(8f, 0f);
+    public Vector2 catStopPosition = new Vector2(8f, 0f);
+
+    [Header("== Environment Colors ==")]
+    public float timeBetweenEvents = 90f;
+    public Color colorNormal = Color.white;
+    public Color colorYellow = new Color(1f, 0.9f, 0.4f, 0.2f);
+    public Color colorRed = new Color(1f, 0.4f, 0.4f, 0.2f);
+    public Color colorGreen = new Color(0.4f, 1f, 0.4f, 0.2f);
+
+    [Header("== Rates & Chances ==")]
+    [Range(0f, 1f)] public float astrologerChance = 0.1f;
+    public GameObject shopCatPrefab;
+    public GameObject astrologerCatPrefab;
+    public GameObject shopMenuCanvas;
+    public GameObject tarotCardPrefab;
+
+    // Internal States
+    private float currentSpawnRate;
+    private float bossTimer;
+    private float eventTimer;
+    private float frostEnemyTimer = 60f;
+    private float gameTimer = 0f;
+    private int currentBossIndex = 0;
+    private bool isBossActive = false;
+    private bool isInEvent = false;
+    private bool isStoryPlaying = false;
+    private bool isHandlingTarotEvent = false;
+    private ShopCat activeShopCat;
+    private Coroutine regularSpawnCoroutine;
+    private List<GameObject> preInstantiatedBosses = new List<GameObject>();
+    private GameObject[] originalEnemyPrefabs;
+
+    void Awake() { Instance = this; }
 
     void Start()
     {
-        // 1. TẠO TRƯỚC TẤT CẢ BOSS (PRE-INSTANTIATION)
         PreInstantiateAllBosses();
-
-        // 2. KHỞI TẠO CƠ BẢN
         currentSpawnRate = initialSpawnRate;
         bossTimer = bossInterval;
+        eventTimer = timeBetweenEvents;
 
-        // 3. BẮT ĐẦU ROUTINE GAME
-        regularSpawnCoroutine = StartCoroutine(RegularEnemySpawnRoutine());
-        spawnRateIncreaseCoroutine = StartCoroutine(SpawnRateIncreaseRoutine());
-
-        // 4. THIẾT LẬP CÁC THAM CHIẾU
-        player = FindAnyObjectByType<Player>();
-        if (player == null) Debug.LogError("Player object not found! Gold system will fail.");
-
+        player = Player.Instance;
         gameMenuManager = GameMenuManager.Instance;
-        if (gameMenuManager == null) Debug.LogError("GameMenuManager instance not found!");
 
-        if (shopMenuCanvas != null)
-        {
-            shopMenuCanvas.SetActive(false);
-        }
+        if (shopMenuCanvas != null) shopMenuCanvas.SetActive(false);
+
+        regularSpawnCoroutine = StartCoroutine(RegularEnemySpawnRoutine());
+        StartCoroutine(SpawnRateIncreaseRoutine());
+
+        // Bắt đầu lời dẫn đầu game
+        StartCoroutine(PlayIntroStory());
     }
-
-    // ==========================================================
-    // ** LOGIC TẠO TRƯỚC (PRE-INSTANTIATION) **
-    // Tác vụ nặng Instantiation được thực hiện ở đây (chỉ 1 lần lúc tải Scene)
-    // ==========================================================
-    private void PreInstantiateAllBosses()
-    {
-        if (bossPrefabs.Length == 0) return;
-
-        Debug.Log($"Pre-instantiating {bossPrefabs.Length} bosses...");
-
-        Vector3 offScreenPos = new Vector3(1000f, 1000f, 0f); // Vị trí ẩn
-
-        foreach (GameObject bossPrefab in bossPrefabs)
-        {
-            if (bossPrefab != null)
-            {
-                // Instantiate boss và đặt nó ở vị trí ẩn
-                GameObject bossObj = Instantiate(bossPrefab, offScreenPos, Quaternion.identity);
-
-                // Ẩn đối tượng boss hoàn toàn
-                bossObj.SetActive(false);
-
-                // Đảm bảo script Enemy được tắt để tránh lỗi null reference khi không active
-                Enemy bossEnemyScript = bossObj.GetComponent<Enemy>();
-                if (bossEnemyScript != null)
-                {
-                    bossEnemyScript.enabled = false;
-                }
-
-                preInstantiatedBosses.Add(bossObj);
-            }
-            else
-            {
-                Debug.LogError("Boss Prefab bị thiếu trong danh sách!");
-            }
-        }
-
-        Debug.Log("Pre-instantiation completed. Bosses are ready in pool.");
-    }
-
 
     void Update()
     {
-        if (gameMenuManager == null || GameMenuManager.CurrentState != GameMenuManager.GameState.Playing || isHandlingTarotEvent)
-        {
+        if (isStoryPlaying || Time.timeScale == 0 || gameMenuManager == null ||
+            GameMenuManager.CurrentState != GameMenuManager.GameState.Playing || isHandlingTarotEvent)
             return;
-        }
 
-        // Chỉ chạy timer nếu chưa có Boss hoạt động VÀ chưa hết danh sách Boss
-        if (isBossActive || currentBossIndex >= preInstantiatedBosses.Count) return;
+        if (Enemy.activeShielders > 0) return;
 
-        bossTimer -= Time.deltaTime;
+        gameTimer += Time.deltaTime;
 
-        if (bossTimer <= 0f)
+        // CHỈ GIỮ LẠI ĐOẠN NÀY, XÓA ĐOẠN TRÙNG LẶP PHÍA DƯỚI
+        if (!isBossActive && !isInEvent && currentBossIndex < preInstantiatedBosses.Count)
         {
-            StartCoroutine(BossSpawnRoutine());
-            bossTimer = bossInterval; // Reset timer cho Boss tiếp theo
-        }
-    }
-
-    // ==========================================================
-    // ** LOGIC TĂNG DẦN TỶ LỆ SPAWN (Độ Khó) **
-    // (Giữ nguyên)
-    // ==========================================================
-    IEnumerator SpawnRateIncreaseRoutine()
-    {
-        float startTime = Time.time;
-        float elapsedTime = 0f;
-
-        while (currentSpawnRate < maxSpawnRate)
-        {
-            if (GameMenuManager.CurrentState == GameMenuManager.GameState.Playing && !isBossActive && !isHandlingTarotEvent)
+            bossTimer -= Time.deltaTime;
+            if (bossTimer <= 0f)
             {
-                elapsedTime = Time.time - startTime;
-
-                float t = Mathf.Clamp01(elapsedTime / timeToReachMaxRate);
-                currentSpawnRate = Mathf.Lerp(initialSpawnRate, maxSpawnRate, t);
+                bossTimer = bossInterval; // Reset ngay lập tức
+                StartCoroutine(BossSpawnRoutine());
             }
-            yield return null;
         }
 
-        currentSpawnRate = maxSpawnRate;
+        // Boss Timer
+        if (!isBossActive && !isInEvent && currentBossIndex < preInstantiatedBosses.Count)
+        {
+            bossTimer -= Time.deltaTime;
+            if (bossTimer <= 0f) StartCoroutine(BossSpawnRoutine());
+        }
     }
 
+    #region Story Logic
+    IEnumerator PlayIntroStory()
+    {
+        isStoryPlaying = true;
+        yield return new WaitForSeconds(1f);
 
-    // --- LOGIC SPAWN QUÁI THƯỜNG ---
-    // (Giữ nguyên)
+        GameObject angel = Instantiate(angelNPCPrefab, new Vector3(8, 0, 0), Quaternion.identity);
+        string[] introLines = {"Ngươi đã tỉnh lại rồi sao, linh hồn nhỏ bé?",
+            "Ngươi đã chết, nhưng hồ sơ của ngươi thật rắc rối...",
+            "Ngươi không đủ tốt để lên Thiên Đàng, cũng chẳng đủ xấu để xuống Địa Ngục.",
+            "Ta sẽ cho ngươi một cơ hội. Vượt qua thử thách này để bay lên phía trên.",
+            "Đừng nhìn xuống. Ánh sáng sẽ dẫn lối." };
+        DialogueManager.Instance.StartDialogue("Thiên Thần", introLines, () => {
+            // Gọi hàm mờ dần thay vì Destroy thẳng
+            StartCoroutine(FadeOutAndDestroy(angel, 1f));
+
+            isStoryPlaying = false;
+            Time.timeScale = 1f; // Đảm bảo game chạy tiếp sau Intro
+        });
+    }
+    void HandleGameEnding()
+    {
+        isStoryPlaying = true;
+        bool isFirstWin = PlayerPrefs.GetInt("BeatenOnce", 0) == 0;
+        if (isFirstWin) StartCoroutine(TrollEndingRoutine());
+        else StartCoroutine(SuperBossEndingRoutine());
+    }
+
+    IEnumerator TrollEndingRoutine()
+    {
+        GameObject angel = Instantiate(angelNPCPrefab, catStopPosition, Quaternion.identity);
+        string[] lines = {
+            "Thật ấn tượng! Ngươi thực sự đã vượt qua tất cả.",
+            "Ngươi xứng đáng bước qua cổng Thiên Đàng.",
+            "...",
+            "Ta đùa đấy.",
+            "Ngươi thực sự nghĩ một kẻ như ngươi có thể lên đây sao?"
+        };
+        DialogueManager.Instance.StartDialogue("Thiên Thần", lines, () => {
+            PlayerPrefs.SetInt("BeatenOnce", 1);
+            player.TakeDamage(9999);
+        });
+        yield return null;
+    }
+
+    IEnumerator SuperBossEndingRoutine()
+    {
+        GameObject angel = Instantiate(angelNPCPrefab, catStopPosition, Quaternion.identity);
+        string[] lines = {
+        "Lại là ngươi? Ngươi vẫn chưa bỏ cuộc sao?",
+        "Lần này ta sẽ không nương tay.",
+        "Hãy đối mặt với cơn thịnh nộ của Thiên Đường!"
+    };
+
+        DialogueManager.Instance.StartDialogue("Thiên Thần", lines, () => {
+            // 1. Xóa NPC Thiên thần cũ
+            Destroy(angel);
+
+            // 2. TẠO BOSS
+            GameObject sb = Instantiate(superAngelBossPrefab, catStopPosition, Quaternion.identity);
+
+            // 3. CẬP NHẬT TRẠNG THÁI (QUAN TRỌNG)
+            isStoryPlaying = false; // Tắt cờ hội thoại để Update() chạy tiếp
+            isBossActive = true;    // Đánh dấu boss đang hoạt động
+            Time.timeScale = 1f;    // Trả lại thời gian để Boss có thể tấn công và Player có thể bắn
+
+            // 4. Theo dõi Boss chết
+            StartCoroutine(WaitAndTriggerHiddenEnding(sb));
+
+            Debug.Log("Super Boss Spawned and Game Resumed!");
+        });
+        yield return null;
+    }
+
+    IEnumerator WaitAndTriggerHiddenEnding(GameObject bossObj)
+    {
+        while (bossObj != null && bossObj.activeInHierarchy) yield return null;
+        Instantiate(heavenGatePrefab, Vector3.zero, Quaternion.identity);
+        yield return new WaitForSeconds(2f);
+        GameObject angel = Instantiate(angelNPCPrefab, new Vector3(2, 0, 0), Quaternion.identity);
+        string[] lines = { "Hạ gục được cả hộ vệ tối cao sao...", "Cánh cổng kia... đúng là dành cho ngươi...", "Nhưng ta mới là người quyết định ai được vào.", "Mơ đẹp nhé." };
+        DialogueManager.Instance.StartDialogue("Thiên Thần", lines, () => { player.TakeDamage(9999); });
+    }
+    #endregion
+
+    #region Spawning System
+    private void PreInstantiateAllBosses()
+    {
+        foreach (GameObject prefab in bossPrefabs)
+        {
+            GameObject b = Instantiate(prefab, new Vector3(1000, 1000, 0), Quaternion.identity);
+            b.SetActive(false);
+            preInstantiatedBosses.Add(b);
+        }
+    }
+
     IEnumerator RegularEnemySpawnRoutine()
     {
         while (true)
         {
-            if (!isBossActive && !isHandlingTarotEvent && GameMenuManager.CurrentState == GameMenuManager.GameState.Playing)
-            {
+            if (Time.timeScale == 0) { yield return null; continue; }
+            if (!isBossActive && !isHandlingTarotEvent && !isStoryPlaying && GameMenuManager.CurrentState == GameState.Playing)
                 SpawnRegularEnemy();
-            }
-
             yield return new WaitForSeconds(1f / currentSpawnRate);
         }
     }
 
     void SpawnRegularEnemy()
     {
+        // Shielder Mini-boss hiếm (Chỉ trong 3p đầu)
+        if (gameTimer < 180f && Enemy.activeShielders == 0 && !isBossActive && !isInEvent && Random.value <= 0.001f)
+        {
+            Instantiate(shielderPrefab, new Vector3(12, 0, 0), Quaternion.identity);
+        }
+
         if (regularEnemyPrefabs.Length == 0) return;
-
-        GameObject enemyToSpawn = regularEnemyPrefabs[Random.Range(0, regularEnemyPrefabs.Length)];
-
-        float spawnX = 12f;
-        float spawnY = Random.Range(spawnYRange.x, spawnYRange.y);
-
-        Vector3 spawnPosition = new Vector3(spawnX, spawnY, 0f);
-
-        Instantiate(enemyToSpawn, spawnPosition, Quaternion.identity);
+        GameObject p = regularEnemyPrefabs[Random.Range(0, regularEnemyPrefabs.Length)];
+        Instantiate(p, new Vector3(12, Random.Range(spawnYRange.x, spawnYRange.y), 0), Quaternion.identity);
     }
 
-    // --- LOGIC SPAWN BOSS TUẦN TỰ (ĐÃ TỐI ƯU) ---
     IEnumerator BossSpawnRoutine()
     {
-        if (currentBossIndex >= preInstantiatedBosses.Count) // Kiểm tra Boss trong Pool
-        {
-            Debug.Log("Đã hoàn thành tất cả Boss trong danh sách!");
-            HandleGameWin();
-            yield break;
-        }
+        isBossActive = true;
+        if (AudioManager.Instance != null) AudioManager.Instance.PlayBossMusic();
 
-        // 🆕 LẤY BOSS TỪ POOL (KHÔNG CẦN INSTANTIATE)
+        // 1. Lấy Boss từ Pool
         GameObject bossObj = preInstantiatedBosses[currentBossIndex];
 
-        // Cập nhật Index cho Boss tiếp theo
-        currentBossIndex++;
-
-        if (regularSpawnCoroutine != null)
-        {
-            StopCoroutine(regularSpawnCoroutine);
-        }
-        isBossActive = true;
-
-        if (AudioManager.Instance != null)
-        {
-            AudioManager.Instance.PlayBossMusic();
-        }
-
-        Debug.Log($"BOSS ALERT! Activating Boss Index {currentBossIndex - 1}: {bossObj.name}.");
-
-        float spawnX = 12f;
-        Vector3 initialBossPosition = new Vector3(spawnX, bossStopPosition.y, 0f);
-
-        // 🆕 KÍCH HOẠT BOSS VÀ VỊ TRÍ BAN ĐẦU
-        bossObj.transform.position = initialBossPosition;
-        bossObj.SetActive(true);
+        // KHAI BÁO BIẾN NÀY ĐỂ HẾT LỖI ĐỎ
         Enemy bossEnemyScript = bossObj.GetComponent<Enemy>();
+
+        currentBossIndex++;
+        bossObj.transform.position = new Vector3(12, bossStopPosition.y, 0);
+        bossObj.SetActive(true);
+
         if (bossEnemyScript != null)
         {
-            bossEnemyScript.enabled = true; // Bật lại script Enemy
+            bossEnemyScript.enabled = true;
+            // Chắc chắn là boss mới chưa bị đánh dấu là đã chết từ game trước
+            // (Nếu bạn có dùng Reset logic bên Enemy)
         }
 
-        Transform bossTransform = bossObj.transform;
-        float moveDuration = 2f;
-        float timer = 0f;
-        Vector3 startPos = initialBossPosition;
-        Vector3 targetPos = bossStopPosition;
-
-        // Boss fly-in animation
-        while (timer < moveDuration)
+        // 2. Hiệu ứng Boss bay vào
+        float t = 0;
+        Vector3 start = bossObj.transform.position;
+        while (t < 1f)
         {
-            timer += Time.deltaTime;
-            float t = timer / moveDuration;
-            bossTransform.position = Vector3.Lerp(startPos, targetPos, t);
+            t += Time.deltaTime / 2f;
+            bossObj.transform.position = Vector3.Lerp(start, bossStopPosition, t);
             yield return null;
         }
-        bossTransform.position = targetPos;
 
-        Debug.Log("Boss reached its stop position. Attacking starts now.");
-
-        // Chờ Boss bị tiêu diệt
-        while (bossEnemyScript != null && bossObj.activeInHierarchy) // Chờ đợi boss bị hủy hoặc bị tắt
+        // 3. CHỜ BOSS CHẾT (Dựa vào biến isDead trong script Enemy)
+        while (bossEnemyScript != null && !bossEnemyScript.isDead)
         {
             yield return null;
         }
 
-        Debug.Log("BOSS DEFEATED: LevelManager manually granting 50 Gold.");
+        Debug.Log("BOSS CONFIRMED DEAD! Moving to events...");
         OnEnemyDefeated(true);
 
-        // 🆕 Sau khi boss chết, chúng ta chỉ cần set nó inactive, không cần Destroy
-        // Mặc dù trong trường hợp Boss, Destroy cũng không gây khựng vì Instantiate đã được trả phí,
-        // nhưng cách này sạch sẽ hơn nếu sau này bạn muốn giữ Boss lại để hiển thị thống kê.
-        if (bossObj != null)
-        {
-            bossObj.SetActive(false);
-            // Thiết lập lại vị trí ẩn
-            bossObj.transform.position = new Vector3(1000f, 1000f, 0f);
-            if (bossEnemyScript != null) bossEnemyScript.enabled = false;
+        // 4. Tắt object để dọn dẹp
+        bossObj.SetActive(false);
+
+        // 5. Kiểm tra Ending hoặc PostBossEvent
+        if (currentBossIndex >= preInstantiatedBosses.Count) HandleGameEnding();
+        else HandlePostBossEvent();
+    }
+    #endregion
+
+    #region Environment Events
+    IEnumerator EnvironmentEventRoutine()
+    {
+        isInEvent = true;
+        int type = Random.Range(0, 3); // 0: Vàng, 1: Đỏ, 2: Xanh
+        Color targetColor = colorNormal;
+        float duration = 10f;
+
+        // --- 1. THIẾT LẬP THÔNG SỐ THEO LOẠI ---
+        if (type == 0) { targetColor = colorYellow; duration = 30f; }
+        else if (type == 1) { targetColor = colorRed; duration = 10f; }
+        else { targetColor = colorGreen; duration = 10f; }
+
+        // --- 2. HIỆU ỨNG BẮT ĐẦU ---
+        yield return StartCoroutine(LerpBackground(targetColor, 2f));
+        player.tookDamageInEvent = false;
+
+        // Lưu lại trạng thái gốc để hoàn tác sau này
+        float originalRate = currentSpawnRate;
+        originalEnemyPrefabs = regularEnemyPrefabs;
+
+        // Thiết lập riêng cho từng loại quái/tốc độ
+        if (type == 0)
+        { // VÀNG
+            regularEnemyPrefabs = new GameObject[] { goldenCoinPrefab };
+            currentSpawnRate += 0.2f;
+        }
+        else if (type == 1)
+        { // ĐỎ
+            regularEnemyPrefabs = new GameObject[] { catGhostPrefab };
+            currentSpawnRate *= 2f;
+        }
+        else if (type == 2)
+        { // XANH LÁ
+            Enemy.globalSpeedMultiplier = 2.5f;
+            currentSpawnRate *= 2f;
         }
 
-        HandlePostBossEvent();
+        // --- 3. VÒNG LẶP THỜI GIAN SỰ KIỆN (Dùng chung cho cả 3 loại) ---
+        float localTimer = 0;
+        bool eventAborted = false;
+
+        while (localTimer < duration)
+        {
+            if (Time.timeScale > 0) // Chỉ đếm giờ khi game đang chạy
+            {
+                localTimer += Time.deltaTime;
+
+                // Kiểm tra điều kiện thất bại riêng của Xanh lá
+                if (type == 2 && player.tookDamageInEvent)
+                {
+                    player.PenaltyHalfHealth();
+                    if (ShopMenu.Instance != null) ShopMenu.Instance.AddRandomShard(false);
+                    eventAborted = true;
+                    break; // Thoát vòng lặp ngay lập tức
+                }
+            }
+            yield return null;
+        }
+
+        // --- 4. TRAO THƯỞNG (Nếu không bị hủy giữa chừng) ---
+        if (!eventAborted)
+        {
+            if (type == 0 && !player.tookDamageInEvent)
+                BlessingMenu.Instance.ShowBlessingSelection();
+
+            else if (type == 1 && player.gameObject.activeInHierarchy)
+            {
+                player.AddGold(50);
+                ShowShopMenu();
+            }
+
+            else if (type == 2 && !player.tookDamageInEvent)
+                if (ShopMenu.Instance != null) ShopMenu.Instance.AddRandomShard(true);
+        }
+
+        // --- 5. DỌN DẸP VÀ HOÀN TÁC (QUAN TRỌNG) ---
+        // Trả lại mọi thứ về nguyên bản dù là loại sự kiện nào
+        regularEnemyPrefabs = originalEnemyPrefabs;
+        currentSpawnRate = originalRate;
+        Enemy.globalSpeedMultiplier = 1f;
+
+        // Hiệu ứng đổi màu về bình thường
+        yield return StartCoroutine(LerpBackground(colorNormal, 2f));
+
+        // Mở khóa cho sự kiện tiếp theo
+        eventTimer = timeBetweenEvents;
+        isInEvent = false;
+
+        Debug.Log($"Sự kiện loại {type} kết thúc. Hệ thống đã được Reset.");
     }
 
-    // --- XỬ LÝ SỰ KIỆN SAU KHI BOSS CHẾT ---
-    // (Giữ nguyên)
+    IEnumerator LerpBackground(Color target, float time)
+    {
+        if (backgroundUI == null) yield break;
+        Color start = backgroundUI.color; float t = 0;
+        while (t < 1f) { t += Time.deltaTime / time; backgroundUI.color = Color.Lerp(start, target, t); yield return null; }
+    }
+    #endregion
+
+    #region UI & Helpers
+    public void ShowShopMenu()
+    {
+        if (shopMenuCanvas == null) return;
+        shopMenuCanvas.SetActive(true);
+        Time.timeScale = 0f;
+        if (gameMenuManager != null) gameMenuManager.PauseGameForEvent();
+        ShopMenu.Instance.Initialize(null);
+    }
+
+    public void HideShopMenu(bool shouldResume = true)
+    {
+        if (shopMenuCanvas == null) return;
+        shopMenuCanvas.SetActive(false);
+        if (activeShopCat != null) activeShopCat.StartExit(false);
+        if (shouldResume) ResumeGameAfterShop();
+    }
+
+    public void ResumeGameAfterShop()
+    {
+        isBossActive = false; isHandlingTarotEvent = false; isInEvent = false;
+        Time.timeScale = 1f;
+        if (gameMenuManager != null) gameMenuManager.ResumeGame();
+        if (AudioManager.Instance != null) AudioManager.Instance.PlayMainMusic();
+    }
+
+    public void OnEnemyDefeated(bool boss) { player.AddGold(boss ? 50 : 1); }
+    public void SkipToNextBoss() { bossTimer = 0.01f; ResumeGameAfterShop(); }
+    public void ActivateGameWin() { HandleGameWin(); }
+    public void ActivateGameOver() { if (gameMenuManager != null) gameMenuManager.GameOver(); }
+    void HandleGameWin() { if (gameMenuManager != null) gameMenuManager.GameWin(); }
+    public void SpawnFrostEnemy() { Instantiate(frostEnemyPrefab, new Vector3(12, Random.Range(spawnYRange.x, spawnYRange.y), 0), Quaternion.identity); }
+    public IEnumerator FrostBlastEffect() { /* Logic cũ của bạn */ yield return null; }
+    #endregion
+
+    IEnumerator SpawnRateIncreaseRoutine()
+    {
+        float start = Time.time;
+        while (currentSpawnRate < maxSpawnRate)
+        {
+            if (Time.timeScale > 0 && !isBossActive && !isInEvent)
+            {
+                currentSpawnRate = Mathf.Lerp(initialSpawnRate, maxSpawnRate, (Time.time - start) / timeToReachMaxRate);
+            }
+            yield return null;
+        }
+    }
+    // --- HÀM XỬ LÝ SỰ KIỆN SAU KHI BOSS CHẾT (ĐÃ BỔ SUNG) ---
     void HandlePostBossEvent()
     {
         float spawnX = 12f;
         Vector3 initialEventPos = new Vector3(spawnX, catStopPosition.y, 0f);
+        float rand = Random.value;
 
-        if (Random.value <= astrologerChance)
+        // 1. SỰ KIỆN TAROT (10%)
+        if (rand <= astrologerChance)
         {
             if (astrologerCatPrefab != null && tarotCardPrefab != null)
             {
-                Debug.Log("Astrologer Cat is coming (10%)! Starting Tarot Event.");
-
+                Debug.Log("Astrologer Cat incoming!");
                 Instantiate(astrologerCatPrefab, initialEventPos, Quaternion.identity);
-
                 GameObject tarotObj = Instantiate(tarotCardPrefab, Vector3.zero, Quaternion.identity);
                 TarotCard tarotScript = tarotObj.GetComponent<TarotCard>();
-
-                if (tarotScript != null)
-                {
-                    tarotScript.Initialize(this, player);
-                }
-                else
-                {
-                    Debug.LogError("TarotCard script not found on prefab!");
-                }
-
+                if (tarotScript != null) tarotScript.Initialize(this, player);
                 isHandlingTarotEvent = true;
             }
-            else
-            {
-                Debug.LogWarning("Astrologer Cat HOẶC Tarot Card Prefab bị thiếu! Tiếp tục game.");
-                ResumeGameAfterShop();
-            }
+            else ResumeGameAfterShop();
         }
+        // 2. SỰ KIỆN BLESSING (45%)
+        else if (rand <= 0.55f)
+        {
+            Debug.Log("Blessing Event triggered!");
+            isHandlingTarotEvent = true;
+            if (BlessingMenu.Instance != null)
+            {
+                BlessingMenu.Instance.ShowBlessingSelection();
+            }
+            else ResumeGameAfterShop();
+        }
+        // 3. SỰ KIỆN SHOP (45%)
         else
         {
             if (shopCatPrefab != null)
             {
-                Debug.Log("Shop Cat is coming (90%)! Showing Shop Menu.");
+                Debug.Log("Shop Cat incoming!");
                 GameObject catObj = Instantiate(shopCatPrefab, initialEventPos, Quaternion.identity);
-
                 activeShopCat = catObj.GetComponent<ShopCat>();
-
                 ShowShopMenu();
             }
-            else
+            else ResumeGameAfterShop();
+        }
+    }
+    IEnumerator FadeOutAndDestroy(GameObject target, float duration)
+    {
+        SpriteRenderer sr = target.GetComponent<SpriteRenderer>();
+        if (sr != null)
+        {
+            Color startColor = sr.color;
+            float timer = 0;
+            while (timer < duration)
             {
-                Debug.LogWarning("Shop Cat Prefab bị thiếu! Tiếp tục game.");
-                ResumeGameAfterShop();
+                timer += Time.unscaledDeltaTime;
+                float alpha = Mathf.Lerp(1f, 0f, timer / duration);
+                sr.color = new Color(startColor.r, startColor.g, startColor.b, alpha);
+                yield return null;
             }
         }
-    }
-
-    public void OnEnemyDefeated(bool isBoss)
-    {
-        if (player == null) return;
-
-        int baseGoldReward = isBoss ? 50 : 1;
-
-        player.AddGold(baseGoldReward);
-    }
-
-    // --- HÀM GỌI LẠI SAU KHI SỰ KIỆN KẾT THÚC ---
-    // (Giữ nguyên)
-    public void ResumeGameAfterShop()
-    {
-        isBossActive = false;
-        isHandlingTarotEvent = false;
-
-        activeShopCat = null;
-
-        Debug.Log("Sự kiện kết thúc. Resuming regular enemy spawn.");
-
-        if (AudioManager.Instance != null)
-        {
-            AudioManager.Instance.PlayMainMusic();
-        }
-
-        if (currentBossIndex < preInstantiatedBosses.Count)
-        {
-            regularSpawnCoroutine = StartCoroutine(RegularEnemySpawnRoutine());
-
-            if (gameMenuManager != null)
-            {
-                gameMenuManager.ResumeGame();
-            }
-        }
-        else
-        {
-            Debug.Log("Tất cả Boss đã bị đánh bại. Cấp độ hoàn thành.");
-        }
-    }
-
-    // ==========================================================
-    // ** HÀM HỖ TRỢ CHO TAROT (Gọi từ TarotCard.cs) **
-    // (Giữ nguyên)
-    // ==========================================================
-
-    public void SkipToNextBoss()
-    {
-        Debug.Log("TAROT: The Hanged Man - Bỏ qua thời gian chờ, chuẩn bị Boss tiếp theo ngay lập tức.");
-        bossTimer = 0.01f;
-        ResumeGameAfterTarot();
-    }
-
-    public void ActivateGameWin()
-    {
-        Debug.Log("TAROT: The World - Kích hoạt chiến thắng ngay lập lập tức.");
-        if (regularSpawnCoroutine != null) StopCoroutine(regularSpawnCoroutine);
-        HandleGameWin();
-    }
-
-    public void ActivateGameOver()
-    {
-        Debug.Log("TAROT: Death - Kích hoạt thua cuộc ngay lập tức.");
-        if (gameMenuManager != null)
-        {
-            gameMenuManager.GameOver();
-        }
-    }
-
-    public void ResumeGameAfterTarot()
-    {
-        ResumeGameAfterShop();
-    }
-
-    // ==========================================================
-    // ** LOGIC ẨN/HIỆN SHOP MENU (ĐÃ BỎ PAUSE/RESUME) **
-    // (Giữ nguyên)
-    // ==========================================================
-    public void ShowShopMenu()
-    {
-        if (shopMenuCanvas != null)
-        {
-            shopMenuCanvas.SetActive(true);
-
-            ShopMenu menuScript = shopMenuCanvas.GetComponent<ShopMenu>();
-            if (menuScript != null)
-            {
-                menuScript.Initialize(null);
-            }
-        }
-    }
-
-    public void HideShopMenu()
-    {
-        if (shopMenuCanvas != null)
-        {
-            shopMenuCanvas.SetActive(false);
-
-            if (activeShopCat != null)
-            {
-                activeShopCat.StartExit();
-            }
-            else
-            {
-                ResumeGameAfterShop();
-            }
-        }
-    }
-
-    void HandleGameWin()
-    {
-        Debug.Log("TẤT CẢ BOSS ĐÃ BỊ ĐÁNH BẠI! GAME WIN!");
-
-        if (regularSpawnCoroutine != null) StopCoroutine(regularSpawnCoroutine);
-
-        if (gameMenuManager != null)
-        {
-            gameMenuManager.GameWin();
-        }
+        Destroy(target);
     }
 }

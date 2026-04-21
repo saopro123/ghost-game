@@ -219,6 +219,11 @@ MonoBehaviour:
   hitFlashDuration: 0.05
   hitFlashCount: 1
   deathFadeDuration: 1
+  pickupPrefabs:
+  - {fileID: 3405414352437107237, guid: 3fb78ee5c5d266e458005b649225e9e3, type: 3}
+  - {fileID: 8456109795898188671, guid: 399816c260d0c424791dc1dd06f2f29b, type: 3}
+  - {fileID: 3929647708306662422, guid: 7247f08abd7733e4fa7e8bc274c2fb09, type: 3}
+  - {fileID: 651782208401804371, guid: c3ecc75e71a861549a57feeeb6bef506, type: 3}
   enemyBulletPrefab: {fileID: 7683735423314721568, guid: c34bd332a14bb8b41b9a8d98520eadf8, type: 3}
   firePoint: {fileID: 2096370787828331103}
   fireRate: 2
