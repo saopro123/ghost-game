@@ -100,10 +100,10 @@ public class SuperAngelBoss : Enemy
     void FanShot()
     {
         if (isInvulnerable) return;
-        float angleStep = 180f / 10;
+        float angleStep = 130f / 10;
         for (int i = 0; i < 11; i++)
         {
-            float angle = -90f + (i * angleStep);
+            float angle = 90f + (i * angleStep);
             Vector2 dir = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad));
             GameObject b = Instantiate(bulletPrefab, transform.position, Quaternion.identity);
             b.GetComponent<EnemyBullet>().SetDirection(dir, 8f);

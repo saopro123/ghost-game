@@ -87,30 +87,43 @@ public class LevelManager : MonoBehaviour
 
     void Update()
     {
+        // 1. Chặn toàn bộ timer nếu game pause hoặc đang diễn cốt truyện/hội thoại
         if (isStoryPlaying || Time.timeScale == 0 || gameMenuManager == null ||
             GameMenuManager.CurrentState != GameMenuManager.GameState.Playing || isHandlingTarotEvent)
             return;
 
+        // 2. Nếu có Shielder Mini-boss, đóng băng tiến trình game
         if (Enemy.activeShielders > 0) return;
 
         gameTimer += Time.deltaTime;
 
-        // CHỈ GIỮ LẠI ĐOẠN NÀY, XÓA ĐOẠN TRÙNG LẶP PHÍA DƯỚI
+        // 3. LOGIC ĐẾM GIỜ SỰ KIỆN MÔI TRƯỜNG (PHẢI CÓ ĐOẠN NÀY)
+        if (!isBossActive && !isInEvent)
+        {
+            eventTimer -= Time.deltaTime;
+            if (eventTimer <= 0)
+            {
+                eventTimer = timeBetweenEvents; // Reset ngay để chặn gọi trùng
+                StartCoroutine(EnvironmentEventRoutine());
+            }
+        }
+
+        // 4. LOGIC ĐẾM GIỜ BOSS (CHỈ GIỮ 1 ĐOẠN NÀY)
         if (!isBossActive && !isInEvent && currentBossIndex < preInstantiatedBosses.Count)
         {
             bossTimer -= Time.deltaTime;
             if (bossTimer <= 0f)
             {
-                bossTimer = bossInterval; // Reset ngay lập tức
+                bossTimer = bossInterval; // Reset ngay
                 StartCoroutine(BossSpawnRoutine());
             }
         }
 
-        // Boss Timer
-        if (!isBossActive && !isInEvent && currentBossIndex < preInstantiatedBosses.Count)
+        // 5. Frost Enemy Timer
+        if (!isBossActive && !isInEvent)
         {
-            bossTimer -= Time.deltaTime;
-            if (bossTimer <= 0f) StartCoroutine(BossSpawnRoutine());
+            frostEnemyTimer -= Time.deltaTime;
+            if (frostEnemyTimer <= 0) { SpawnFrostEnemy(); frostEnemyTimer = 60f; }
         }
     }
 
@@ -292,90 +305,59 @@ public class LevelManager : MonoBehaviour
         Color targetColor = colorNormal;
         float duration = 10f;
 
-        // --- 1. THIẾT LẬP THÔNG SỐ THEO LOẠI ---
         if (type == 0) { targetColor = colorYellow; duration = 30f; }
         else if (type == 1) { targetColor = colorRed; duration = 10f; }
         else { targetColor = colorGreen; duration = 10f; }
 
-        // --- 2. HIỆU ỨNG BẮT ĐẦU ---
+        // 1. HIỆU ỨNG BẮT ĐẦU
         yield return StartCoroutine(LerpBackground(targetColor, 2f));
         player.tookDamageInEvent = false;
 
-        // Lưu lại trạng thái gốc để hoàn tác sau này
         float originalRate = currentSpawnRate;
         originalEnemyPrefabs = regularEnemyPrefabs;
 
-        // Thiết lập riêng cho từng loại quái/tốc độ
-        if (type == 0)
-        { // VÀNG
-            regularEnemyPrefabs = new GameObject[] { goldenCoinPrefab };
-            currentSpawnRate += 0.2f;
-        }
-        else if (type == 1)
-        { // ĐỎ
-            regularEnemyPrefabs = new GameObject[] { catGhostPrefab };
-            currentSpawnRate *= 2f;
-        }
-        else if (type == 2)
-        { // XANH LÁ
-            Enemy.globalSpeedMultiplier = 2.5f;
-            currentSpawnRate *= 2f;
-        }
+        if (type == 0) { regularEnemyPrefabs = new GameObject[] { goldenCoinPrefab }; currentSpawnRate += 0.2f; }
+        else if (type == 1) { regularEnemyPrefabs = new GameObject[] { catGhostPrefab }; currentSpawnRate *= 2f; }
+        else if (type == 2) { Enemy.globalSpeedMultiplier = 2.5f; currentSpawnRate *= 2f; }
 
-        // --- 3. VÒNG LẶP THỜI GIAN SỰ KIỆN (Dùng chung cho cả 3 loại) ---
+        // 2. VÒNG LẶP THỜI GIAN SỰ KIỆN (Dùng chung while để an toàn)
         float localTimer = 0;
         bool eventAborted = false;
 
         while (localTimer < duration)
         {
-            if (Time.timeScale > 0) // Chỉ đếm giờ khi game đang chạy
+            if (Time.timeScale > 0) // Chỉ đếm khi game đang chạy
             {
                 localTimer += Time.deltaTime;
-
-                // Kiểm tra điều kiện thất bại riêng của Xanh lá
                 if (type == 2 && player.tookDamageInEvent)
                 {
                     player.PenaltyHalfHealth();
                     if (ShopMenu.Instance != null) ShopMenu.Instance.AddRandomShard(false);
                     eventAborted = true;
-                    break; // Thoát vòng lặp ngay lập tức
+                    break;
                 }
             }
             yield return null;
         }
 
-        // --- 4. TRAO THƯỞNG (Nếu không bị hủy giữa chừng) ---
+        // 3. TRAO THƯỞNG
         if (!eventAborted)
         {
-            if (type == 0 && !player.tookDamageInEvent)
-                BlessingMenu.Instance.ShowBlessingSelection();
-
-            else if (type == 1 && player.gameObject.activeInHierarchy)
-            {
-                player.AddGold(50);
-                ShowShopMenu();
-            }
-
-            else if (type == 2 && !player.tookDamageInEvent)
-                if (ShopMenu.Instance != null) ShopMenu.Instance.AddRandomShard(true);
+            if (type == 0 && !player.tookDamageInEvent) BlessingMenu.Instance.ShowBlessingSelection();
+            else if (type == 1 && player.gameObject.activeInHierarchy) { player.AddGold(50); ShowShopMenu(); }
+            else if (type == 2 && !player.tookDamageInEvent) if (ShopMenu.Instance != null) ShopMenu.Instance.AddRandomShard(true);
         }
 
-        // --- 5. DỌN DẸP VÀ HOÀN TÁC (QUAN TRỌNG) ---
-        // Trả lại mọi thứ về nguyên bản dù là loại sự kiện nào
+        // 4. DỌN DẸP
         regularEnemyPrefabs = originalEnemyPrefabs;
         currentSpawnRate = originalRate;
         Enemy.globalSpeedMultiplier = 1f;
 
-        // Hiệu ứng đổi màu về bình thường
         yield return StartCoroutine(LerpBackground(colorNormal, 2f));
-
-        // Mở khóa cho sự kiện tiếp theo
         eventTimer = timeBetweenEvents;
         isInEvent = false;
-
-        Debug.Log($"Sự kiện loại {type} kết thúc. Hệ thống đã được Reset.");
+        Debug.Log($"Sự kiện {type} kết thúc.");
     }
-
     IEnumerator LerpBackground(Color target, float time)
     {
         if (backgroundUI == null) yield break;

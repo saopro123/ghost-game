@@ -100,6 +100,11 @@ public class Player : MonoBehaviour
     private const int KILLS_FOR_LIFE = 10;
     private Coroutine explosiveRoutine;
     private Coroutine invincibilityRoutine;
+    [Header("== Transformation Sprites ==")]
+    public Sprite baseSprite;    // Sprite chú ma bình thường
+    public Sprite divineSprite;  // Sprite hệ Thánh
+    public Sprite devilSprite;   // Sprite hệ Quỷ
+    public Sprite mysticSprite;  // Sprite hệ Bí ẩn
 
     void Awake()
     {
@@ -612,6 +617,7 @@ public class Player : MonoBehaviour
         devilLives = 1; // Cho sẵn 1 mạng khi kích hoạt
         currentDevilDmgBonus = 0.5f; // Bắt đầu với 50% bonus
         RefreshHPUI();
+        UpdateTransformation();
     }
     public void ActivateDivineSynergy()
     {
@@ -620,12 +626,14 @@ public class Player : MonoBehaviour
         // Giảm thời gian hồi shield (nếu bạn dùng biến float cho cooldown shield)
         // Ví dụ: shieldCooldown = 10f; 
         Debug.Log("DIVINE SYNERGY: Max HP +100 & Fast Shield Regen!");
+        UpdateTransformation();
     }
     public void ActivateMysticSynergy()
     {
         isMysticSynergy = true;
         // Tự động kích hoạt hút tiền (Fate's Magnet)
         Debug.Log("MYSTIC SYNERGY: Shop limit removed & Damage scales with Gold!");
+        UpdateTransformation();
     }
     public void ResetStatsToBase()
     {
@@ -728,5 +736,41 @@ public class Player : MonoBehaviour
         UpdateGhostAlpha();
         isInvincible = false;
         invincibilityRoutine = null; // Giải phóng biến
+    }
+    private void UpdateTransformation()
+    {
+        if (spriteRenderer == null) return;
+
+        // Ưu tiên kiểm tra theo thứ tự Synergy
+        if (isDevilSynergy)
+        {
+            if (devilSprite != null) spriteRenderer.sprite = devilSprite;
+        }
+        else if (isDivineSynergy)
+        {
+            if (divineSprite != null) spriteRenderer.sprite = divineSprite;
+        }
+        else if (isMysticSynergy)
+        {
+            if (mysticSprite != null) spriteRenderer.sprite = mysticSprite;
+        }
+        else
+        {
+            if (baseSprite != null) spriteRenderer.sprite = baseSprite;
+        }
+
+        // Hiệu ứng lóe sáng khi biến hình cho "ngầu"
+        StartCoroutine(TransformationFlashRoutine());
+    }
+
+    IEnumerator TransformationFlashRoutine()
+    {
+        // Lóe sáng trắng trong 0.2 giây
+        Color oldColor = spriteRenderer.color;
+        spriteRenderer.color = Color.white;
+        yield return new WaitForSecondsRealtime(0.2f);
+
+        // Trả về độ trong suốt theo máu hiện tại
+        UpdateGhostAlpha();
     }
 }

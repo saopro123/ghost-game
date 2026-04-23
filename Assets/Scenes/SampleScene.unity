@@ -2733,6 +2733,10 @@ MonoBehaviour:
   isVSplitShot: 0
   devilLives: 0
   currentDevilDmgBonus: 0
+  baseSprite: {fileID: 4448715427215634006, guid: 492c4b7eeb3972b4fac7f2811a6063ec, type: 3}
+  divineSprite: {fileID: -1016280815877623451, guid: 35e131f789fc12d43a32de7280d44482, type: 3}
+  devilSprite: {fileID: 1108542163483581086, guid: 481e8e944e966964095fd8bd241ca6a6, type: 3}
+  mysticSprite: {fileID: -7782561454315708272, guid: d84339e91c5dbe14486e1c3a1dd198a5, type: 3}
   explosionPrefab: {fileID: 4872949183469124589, guid: 9df40edc3caca1546abbf03fe661ea9c, type: 3}
   spectralBuddyPrefab: {fileID: 8983608621246536613, guid: 47b62704d37f6d14ebc19ba11051fa56, type: 3}
   hasExplosionOnDeath: 0
@@ -7016,7 +7020,7 @@ MonoBehaviour:
   maxSpawnRate: 3
   timeToReachMaxRate: 400
   spawnYRange: {x: -5, y: 5}
-  bossInterval: 120
+  bossInterval: 150
   bossStopPosition: {x: 9, y: 0}
   catStopPosition: {x: 8, y: 0}
   timeBetweenEvents: 45
